@@ -19,6 +19,7 @@
 package reader
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -29,11 +30,15 @@ import (
 	"github.com/scionproto/scion/go/sig/egress/iface"
 	"github.com/scionproto/scion/go/sig/egress/router"
 	"github.com/scionproto/scion/go/sig/internal/metrics"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
 const (
 	ip4Ver    = 0x4
 	ip6Ver    = 0x6
+	ip4SrcOff = 12
 	ip4DstOff = 16
 	ip6DstOff = 24
 )
@@ -78,6 +83,18 @@ BatchLoop:
 			}
 			buf = buf[:length]
 			dstIP, err := r.getDestIP(buf)
+			srcIP, err := r.getSrcIP(buf)
+			fmt.Printf("Egress: Dst IP is: %v\n", dstIP)
+			fmt.Printf("Egress: Src IP is: %v\n", srcIP)
+			pkt := gopacket.NewPacket(buf[:length], layers.LayerTypeIPv4, gopacket.Default)
+			for _, layer := range pkt.Layers() {
+				fmt.Println("Egress: PACKET LAYER:", layer.LayerType())
+			}
+			l4 := pkt.ApplicationLayer()
+			if l4 != nil {
+				fmt.Println(string(l4.Payload()))
+			}
+
 			if err != nil {
 				// Release buffer back to free buffer pool
 				iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
@@ -108,6 +125,18 @@ func (r *Reader) getDestIP(b common.RawBytes) (net.IP, error) {
 	switch ver {
 	case ip4Ver:
 		return net.IP(b[ip4DstOff : ip4DstOff+net.IPv4len]), nil
+	case ip6Ver:
+		return net.IP(b[ip6DstOff : ip6DstOff+net.IPv6len]), nil
+	default:
+		return nil, common.NewBasicError("Unsupported IP protocol version in egress packet", nil,
+			"type", ver)
+	}
+}
+func (r *Reader) getSrcIP(b common.RawBytes) (net.IP, error) {
+	ver := (b[0] >> 4)
+	switch ver {
+	case ip4Ver:
+		return net.IP(b[ip4SrcOff : ip4SrcOff+net.IPv4len]), nil
 	case ip6Ver:
 		return net.IP(b[ip6DstOff : ip6DstOff+net.IPv6len]), nil
 	default:

@@ -26,6 +26,9 @@ import (
 	"github.com/scionproto/scion/go/lib/ringbuf"
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/sig/internal/metrics"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
 const (
@@ -154,6 +157,14 @@ func (w *Worker) cleanup() {
 }
 
 func (w *Worker) send(packet common.RawBytes) error {
+	pkt := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default)
+	for _, layer := range pkt.Layers() {
+		fmt.Println("Ingress: PACKET LAYER:", layer.LayerType())
+	}
+	l4 := pkt.ApplicationLayer()
+	if l4 != nil {
+		fmt.Println(string(l4.Payload()))
+	}
 	bytesWritten, err := w.tunIO.Write(packet)
 	if err != nil {
 		return common.NewBasicError("Unable to write to internal ingress", err,
