@@ -19,6 +19,9 @@
 package reader
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"net"
@@ -83,8 +86,11 @@ BatchLoop:
 			}
 			buf = buf[:length]
 			dstIP, err := r.getDestIP(buf)
+			tmp := make([]byte, len(dstIP))
+			copy(tmp, dstIP)
+			dstIP = tmp
 			srcIP, err := r.getSrcIP(buf)
-			fmt.Printf("Egress: Dst IP is: %v\n", dstIP)
+			fmt.Printf("Egress: Dst IP before is: %v\n", dstIP)
 			fmt.Printf("Egress: Src IP is: %v\n", srcIP)
 			pkt := gopacket.NewPacket(buf[:length], layers.LayerTypeIPv4, gopacket.Default)
 			for _, layer := range pkt.Layers() {
@@ -95,6 +101,25 @@ BatchLoop:
 				fmt.Println(string(l4.Payload()))
 			}
 
+			// encrypt the full package
+			key := []byte("passphrasewhichneedstobe32bytes!")
+			c, err := aes.NewCipher(key)
+			if err != nil {
+				fmt.Println(err)
+			}
+			gcm, err := cipher.NewGCM(c)
+			if err != nil {
+				fmt.Println(err)
+			}
+			nonce := make([]byte, gcm.NonceSize())
+			if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+				fmt.Println(err)
+			}
+			fmt.Printf("%x\n", nonce)
+			buf = gcm.Seal(nonce, nonce, buf, nil)
+			fmt.Printf("len buf: %v\n", len(buf))
+			//buf = buf[:len(buf)]
+
 			if err != nil {
 				// Release buffer back to free buffer pool
 				iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
@@ -102,6 +127,7 @@ BatchLoop:
 				r.log.Error("EgressReader: unable to get dest IP", "err", err)
 				continue
 			}
+			fmt.Printf("Egress: Dst IP after is: %v\n", dstIP)
 			dstIA, dstRing := router.NetMap.Lookup(dstIP)
 			if dstRing == nil {
 				// Release buffer back to free buffer pool

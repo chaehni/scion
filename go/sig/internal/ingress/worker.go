@@ -16,6 +16,8 @@
 package ingress
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"fmt"
 	"io"
 	"time"
@@ -157,7 +159,32 @@ func (w *Worker) cleanup() {
 }
 
 func (w *Worker) send(packet common.RawBytes) error {
-	pkt := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default)
+
+	// decrypt everything
+	fmt.Printf("len packet: %v\n", len(packet))
+	key := []byte("passphrasewhichneedstobe32bytes!")
+	c, err := aes.NewCipher(key)
+	if err != nil {
+		fmt.Println(err)
+	}
+	gcm, err := cipher.NewGCM(c)
+	if err != nil {
+		fmt.Println(err)
+	}
+	nonceSize := gcm.NonceSize()
+	if len(packet) < nonceSize {
+		fmt.Println(err)
+	}
+	nonce, ciphertext := packet[:nonceSize], packet[nonceSize:]
+	fmt.Println(nonce)
+	res, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+	//packet = packet[:len(packet)]
+
+	pkt := gopacket.NewPacket(res, layers.LayerTypeIPv4, gopacket.Default)
+	fmt.Printf("Packet from %v\n", w.Remote.Host)
 	for _, layer := range pkt.Layers() {
 		fmt.Println("Ingress: PACKET LAYER:", layer.LayerType())
 	}
@@ -165,10 +192,10 @@ func (w *Worker) send(packet common.RawBytes) error {
 	if l4 != nil {
 		fmt.Println(string(l4.Payload()))
 	}
-	bytesWritten, err := w.tunIO.Write(packet)
+	bytesWritten, err := w.tunIO.Write(res)
 	if err != nil {
 		return common.NewBasicError("Unable to write to internal ingress", err,
-			"length", len(packet))
+			"length", len(res))
 	}
 	w.sentCtrs.Pkts.Inc()
 	w.sentCtrs.Bytes.Add(float64(bytesWritten))
