@@ -28,6 +28,7 @@ import (
 	"github.com/scionproto/scion/go/lib/ringbuf"
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/sig/internal/metrics"
+	"github.com/scionproto/scion/go/sig/internal/zoning/transform"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -161,7 +162,7 @@ func (w *Worker) cleanup() {
 func (w *Worker) send(packet common.RawBytes) error {
 
 	// decrypt everything
-	fmt.Printf("len packet: %v\n", len(packet))
+	//fmt.Printf("len packet: %v\n", len(packet))
 	key := []byte("passphrasewhichneedstobe32bytes!")
 	c, err := aes.NewCipher(key)
 	if err != nil {
@@ -171,19 +172,16 @@ func (w *Worker) send(packet common.RawBytes) error {
 	if err != nil {
 		fmt.Println(err)
 	}
-	nonceSize := gcm.NonceSize()
-	if len(packet) < nonceSize {
-		fmt.Println(err)
-	}
-	nonce, ciphertext := packet[:nonceSize], packet[nonceSize:]
-	fmt.Println(nonce)
-	res, err := gcm.Open(nil, nonce, ciphertext, nil)
+	t := transform.Transformer{gcm}
+
+	_, packet, err = t.FromIR(packet)
 	if err != nil {
 		fmt.Println(err)
 	}
-	//packet = packet[:len(packet)]
 
-	pkt := gopacket.NewPacket(res, layers.LayerTypeIPv4, gopacket.Default)
+	fmt.Printf("additional data: %s\n", packet)
+
+	pkt := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default)
 	fmt.Printf("Packet from %v\n", w.Remote.Host)
 	for _, layer := range pkt.Layers() {
 		fmt.Println("Ingress: PACKET LAYER:", layer.LayerType())
@@ -192,10 +190,10 @@ func (w *Worker) send(packet common.RawBytes) error {
 	if l4 != nil {
 		fmt.Println(string(l4.Payload()))
 	}
-	bytesWritten, err := w.tunIO.Write(res)
+	bytesWritten, err := w.tunIO.Write(packet)
 	if err != nil {
 		return common.NewBasicError("Unable to write to internal ingress", err,
-			"length", len(res))
+			"length", len(packet))
 	}
 	w.sentCtrs.Pkts.Inc()
 	w.sentCtrs.Bytes.Add(float64(bytesWritten))

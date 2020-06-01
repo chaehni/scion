@@ -21,7 +21,6 @@ package reader
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/rand"
 	"fmt"
 	"io"
 	"net"
@@ -33,6 +32,7 @@ import (
 	"github.com/scionproto/scion/go/sig/egress/iface"
 	"github.com/scionproto/scion/go/sig/egress/router"
 	"github.com/scionproto/scion/go/sig/internal/metrics"
+	"github.com/scionproto/scion/go/sig/internal/zoning/transform"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -111,13 +111,13 @@ BatchLoop:
 			if err != nil {
 				fmt.Println(err)
 			}
-			nonce := make([]byte, gcm.NonceSize())
-			if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+
+			t := transform.Transformer{gcm}
+			buf, err = t.ToIR(buf, []byte("12345678"))
+			if err != nil {
 				fmt.Println(err)
 			}
-			fmt.Printf("%x\n", nonce)
-			buf = gcm.Seal(nonce, nonce, buf, nil)
-			fmt.Printf("len buf: %v\n", len(buf))
+			fmt.Printf("buffer size is: %v\n", len(buf))
 			//buf = buf[:len(buf)]
 
 			if err != nil {
