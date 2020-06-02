@@ -107,18 +107,19 @@ func realMain() int {
 		base.PollReqHdlr()
 	}()
 
-	/* Zoning */
-	// create pipeline with modules
-	egressPipeline := zoning.Pipeline{}
-	ingressPipeline := zoning.Pipeline{}
+	/* Start of Zoning */
+	// create chain of modules
+	egressChain := zoning.Chain{}
+	ingressChain := zoning.Chain{}
 	core := &zoning.CoreModule{}
 	//am := &auth.Module{}
 	tm := &transfer.Module{}
-	egressPipeline.Register(core, tm)
-	ingressPipeline.Register(tm, core)
+	egressChain.Register(core, tm)
+	ingressChain.Register(tm, core)
+	/* End of Zoning */
 
-	egress.Init(tunIO, egressPipeline)
-	ingress.Init(tunIO, ingressPipeline)
+	egress.Init(tunIO, egressChain)
+	ingress.Init(tunIO, ingressChain)
 	http.HandleFunc("/config", configHandler)
 	http.HandleFunc("/info", env.InfoHandler)
 	cfg.Metrics.StartPrometheus()

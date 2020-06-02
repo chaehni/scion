@@ -7,24 +7,24 @@ import (
 	"github.com/scionproto/scion/go/lib/common"
 )
 
-// Pipeline is a pipeline of modules which are passed by each packet
-type Pipeline struct {
+// Chain is a pipeline of modules which is traversed by each packet
+type Chain struct {
 	modules []Module
 	mutex   sync.Mutex
 }
 
 // Register adds the passed modules to the Pipeline in the same order they are provided in the argument
-func (p *Pipeline) Register(m ...Module) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	p.modules = append(p.modules, m...)
+func (c *Chain) Register(m ...Module) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.modules = append(c.modules, m...)
 }
 
 // Handle passes the packet to the registered modules. If a module returns an error, the error is returned from the pipeline.
 // Ohterwise the returned packet is the result of all modules applied to the input packet
-func (p *Pipeline) Handle(pkt Packet) (Packet, error) {
+func (c *Chain) Handle(pkt Packet) (Packet, error) {
 	var err error
-	for _, m := range p.modules {
+	for _, m := range c.modules {
 		pkt, err = m.Handle(pkt)
 		if err != nil {
 			return Packet{}, err
