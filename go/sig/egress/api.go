@@ -24,15 +24,16 @@ import (
 	"github.com/scionproto/scion/go/sig/egress/asmap"
 	"github.com/scionproto/scion/go/sig/egress/iface"
 	"github.com/scionproto/scion/go/sig/egress/reader"
+	"github.com/scionproto/scion/go/sig/zoning"
 )
 
-func Init(tunIO io.ReadWriteCloser) {
+func Init(tunIO io.ReadWriteCloser, pipe zoning.Pipeline) {
 	fatal.Check()
 	iface.Init()
 	// Spawn egress reader
 	go func() {
 		defer log.HandlePanic()
-		reader.NewReader(tunIO).Run()
+		reader.NewReader(tunIO, pipe).Run()
 	}()
 }
 

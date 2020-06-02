@@ -28,6 +28,7 @@ import (
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/lib/sock/reliable"
 	"github.com/scionproto/scion/go/sig/internal/metrics"
+	"github.com/scionproto/scion/go/sig/zoning"
 )
 
 const (
@@ -44,12 +45,14 @@ type Dispatcher struct {
 	workers            map[string]*Worker
 	extConn            *snet.Conn
 	tunIO              io.ReadWriteCloser
+	pipeline           zoning.Pipeline
 	framesRecvCounters map[metrics.CtrPairKey]metrics.CtrPair
 }
 
-func NewDispatcher(tio io.ReadWriteCloser, conn *snet.Conn) *Dispatcher {
+func NewDispatcher(tio io.ReadWriteCloser, pipe zoning.Pipeline, conn *snet.Conn) *Dispatcher {
 	return &Dispatcher{
 		tunIO:              tio,
+		pipeline:           pipe,
 		extConn:            conn,
 		framesRecvCounters: make(map[metrics.CtrPairKey]metrics.CtrPair),
 		workers:            make(map[string]*Worker),
@@ -102,7 +105,7 @@ func (d *Dispatcher) dispatch(frame *FrameBuf, src *snet.UDPAddr) {
 	// Check if we already have a worker running and start one if not.
 	worker, ok := d.workers[dispatchStr]
 	if !ok {
-		worker = NewWorker(src, frame.sessId, d.tunIO)
+		worker = NewWorker(src, frame.sessId, d.tunIO, d.pipeline)
 		d.workers[dispatchStr] = worker
 		go func() {
 			defer log.HandlePanic()

@@ -26,6 +26,10 @@ import (
 	"os/user"
 	"sync/atomic"
 
+	"github.com/scionproto/scion/go/sig/zoning/transfer"
+
+	"github.com/scionproto/scion/go/sig/zoning"
+
 	"github.com/BurntSushi/toml"
 	"github.com/syndtr/gocapability/capability"
 
@@ -104,11 +108,18 @@ func realMain() int {
 		defer log.HandlePanic()
 		base.PollReqHdlr()
 	}()
-	egress.Init(tunIO)
-	ingress.Init(tunIO)
+
+	/* Zoning */
+	// create pipeline with modules
+	pipe := zoning.Pipeline{}
+	pipe.Register(&transfer.Module{})
+
+	egress.Init(tunIO, pipe)
+	ingress.Init(tunIO, pipe)
 	http.HandleFunc("/config", configHandler)
 	http.HandleFunc("/info", env.InfoHandler)
 	cfg.Metrics.StartPrometheus()
+
 	select {
 	case <-fatal.ShutdownChan():
 		return 0

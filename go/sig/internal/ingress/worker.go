@@ -16,8 +16,6 @@
 package ingress
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"fmt"
 	"io"
 	"time"
@@ -28,10 +26,7 @@ import (
 	"github.com/scionproto/scion/go/lib/ringbuf"
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/sig/internal/metrics"
-	"github.com/scionproto/scion/go/sig/internal/zoning/transform"
-
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
+	"github.com/scionproto/scion/go/sig/zoning"
 )
 
 const (
@@ -55,10 +50,11 @@ type Worker struct {
 	markedForCleanup bool
 	sentCtrs         metrics.CtrPair
 	tunIO            io.ReadWriteCloser
+	pipeline         zoning.Pipeline
 }
 
 func NewWorker(remote *snet.UDPAddr, sessId sig_mgmt.SessionType,
-	tunIO io.ReadWriteCloser) *Worker {
+	tunIO io.ReadWriteCloser, pipe zoning.Pipeline) *Worker {
 
 	worker := &Worker{
 		Logger: log.New("ingress", remote.String(), "sessId", sessId),
@@ -72,7 +68,8 @@ func NewWorker(remote *snet.UDPAddr, sessId sig_mgmt.SessionType,
 			Bytes: metrics.PktBytesSent.WithLabelValues(remote.IA.String(),
 				sessId.String()),
 		},
-		tunIO: tunIO,
+		tunIO:    tunIO,
+		pipeline: pipe,
 	}
 	return worker
 }
@@ -161,35 +158,9 @@ func (w *Worker) cleanup() {
 
 func (w *Worker) send(packet common.RawBytes) error {
 
-	// decrypt everything
-	//fmt.Printf("len packet: %v\n", len(packet))
-	key := []byte("passphrasewhichneedstobe32bytes!")
-	c, err := aes.NewCipher(key)
-	if err != nil {
-		fmt.Println(err)
-	}
-	gcm, err := cipher.NewGCM(c)
-	if err != nil {
-		fmt.Println(err)
-	}
-	t := transform.Transformer{gcm}
+	pkt := zoning.Packet{nil, nil, packet}
+	w.pipeline.Handle(pkt)
 
-	_, packet, err = t.FromIR(packet)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	fmt.Printf("additional data: %s\n", packet)
-
-	pkt := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default)
-	fmt.Printf("Packet from %v\n", w.Remote.Host)
-	for _, layer := range pkt.Layers() {
-		fmt.Println("Ingress: PACKET LAYER:", layer.LayerType())
-	}
-	l4 := pkt.ApplicationLayer()
-	if l4 != nil {
-		fmt.Println(string(l4.Payload()))
-	}
 	bytesWritten, err := w.tunIO.Write(packet)
 	if err != nil {
 		return common.NewBasicError("Unable to write to internal ingress", err,

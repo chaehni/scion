@@ -19,12 +19,11 @@
 package reader
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
-	"fmt"
 	"io"
 	"net"
 	"os"
+
+	"github.com/scionproto/scion/go/sig/zoning"
 
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/log"
@@ -32,10 +31,6 @@ import (
 	"github.com/scionproto/scion/go/sig/egress/iface"
 	"github.com/scionproto/scion/go/sig/egress/router"
 	"github.com/scionproto/scion/go/sig/internal/metrics"
-	"github.com/scionproto/scion/go/sig/internal/zoning/transform"
-
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 )
 
 const (
@@ -47,12 +42,13 @@ const (
 )
 
 type Reader struct {
-	log   log.Logger
-	tunIO io.ReadWriteCloser
+	log      log.Logger
+	tunIO    io.ReadWriteCloser
+	pipeline zoning.Pipeline
 }
 
-func NewReader(tunIO io.ReadWriteCloser) *Reader {
-	return &Reader{log: log.New(), tunIO: tunIO}
+func NewReader(tunIO io.ReadWriteCloser, pipe zoning.Pipeline) *Reader {
+	return &Reader{log: log.New(), tunIO: tunIO, pipeline: pipe}
 }
 
 func (r *Reader) Run() {
@@ -86,40 +82,6 @@ BatchLoop:
 			}
 			buf = buf[:length]
 			dstIP, err := r.getDestIP(buf)
-			tmp := make([]byte, len(dstIP))
-			copy(tmp, dstIP)
-			dstIP = tmp
-			srcIP, err := r.getSrcIP(buf)
-			fmt.Printf("Egress: Dst IP before is: %v\n", dstIP)
-			fmt.Printf("Egress: Src IP is: %v\n", srcIP)
-			pkt := gopacket.NewPacket(buf[:length], layers.LayerTypeIPv4, gopacket.Default)
-			for _, layer := range pkt.Layers() {
-				fmt.Println("Egress: PACKET LAYER:", layer.LayerType())
-			}
-			l4 := pkt.ApplicationLayer()
-			if l4 != nil {
-				fmt.Println(string(l4.Payload()))
-			}
-
-			// encrypt the full package
-			key := []byte("passphrasewhichneedstobe32bytes!")
-			c, err := aes.NewCipher(key)
-			if err != nil {
-				fmt.Println(err)
-			}
-			gcm, err := cipher.NewGCM(c)
-			if err != nil {
-				fmt.Println(err)
-			}
-
-			t := transform.Transformer{gcm}
-			buf, err = t.ToIR(buf, []byte("12345678"))
-			if err != nil {
-				fmt.Println(err)
-			}
-			fmt.Printf("buffer size is: %v\n", len(buf))
-			//buf = buf[:len(buf)]
-
 			if err != nil {
 				// Release buffer back to free buffer pool
 				iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
@@ -127,7 +89,25 @@ BatchLoop:
 				r.log.Error("EgressReader: unable to get dest IP", "err", err)
 				continue
 			}
-			fmt.Printf("Egress: Dst IP after is: %v\n", dstIP)
+			srcIP, err := r.getSrcIP(buf)
+			if err != nil {
+				// Release buffer back to free buffer pool
+				iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
+				// FIXME(kormat): replace with metric.
+				r.log.Error("EgressReader: unable to get src IP", "err", err)
+				continue
+			}
+			pkt := zoning.Packet{srcIP, dstIP, buf}
+			pkt, err = r.pipeline.Handle(pkt)
+
+			if err != nil {
+				// Release buffer back to free buffer pool
+				iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
+				// FIXME(kormat): replace with metric.
+				r.log.Error("EgressReader: zoning error", "err", err)
+				continue
+			}
+
 			dstIA, dstRing := router.NetMap.Lookup(dstIP)
 			if dstRing == nil {
 				// Release buffer back to free buffer pool
