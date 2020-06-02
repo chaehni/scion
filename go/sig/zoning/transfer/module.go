@@ -8,7 +8,7 @@ import (
 	"github.com/scionproto/scion/go/sig/zoning"
 )
 
-// Module implements the Module interface.
+// Module implements the transfer module.
 // It checks packets for valid zone transfers.
 type Module struct{}
 

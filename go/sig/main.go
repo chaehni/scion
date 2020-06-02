@@ -26,10 +26,6 @@ import (
 	"os/user"
 	"sync/atomic"
 
-	"github.com/scionproto/scion/go/sig/zoning/transfer"
-
-	"github.com/scionproto/scion/go/sig/zoning"
-
 	"github.com/BurntSushi/toml"
 	"github.com/syndtr/gocapability/capability"
 
@@ -48,6 +44,8 @@ import (
 	"github.com/scionproto/scion/go/sig/internal/sigcmn"
 	"github.com/scionproto/scion/go/sig/internal/sigconfig"
 	"github.com/scionproto/scion/go/sig/internal/xnet"
+	"github.com/scionproto/scion/go/sig/zoning"
+	"github.com/scionproto/scion/go/sig/zoning/transfer"
 )
 
 var (
@@ -111,11 +109,16 @@ func realMain() int {
 
 	/* Zoning */
 	// create pipeline with modules
-	pipe := zoning.Pipeline{}
-	pipe.Register(&transfer.Module{})
+	egressPipeline := zoning.Pipeline{}
+	ingressPipeline := zoning.Pipeline{}
+	core := &zoning.CoreModule{}
+	//am := &auth.Module{}
+	tm := &transfer.Module{}
+	egressPipeline.Register(core, tm)
+	ingressPipeline.Register(tm, core)
 
-	egress.Init(tunIO, pipe)
-	ingress.Init(tunIO, pipe)
+	egress.Init(tunIO, egressPipeline)
+	ingress.Init(tunIO, ingressPipeline)
 	http.HandleFunc("/config", configHandler)
 	http.HandleFunc("/info", env.InfoHandler)
 	cfg.Metrics.StartPrometheus()

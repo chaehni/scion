@@ -100,9 +100,9 @@ func (t *Transformer) UpdateKey() error {
 	return errors.New("not implemented")
 }
 
-// nextNonce creates a new, unique nonce
-// it is the little endian byte representation of a nonce counter
-// in case the nonce is longer than 8 bytes the remaining capacity is filled with random bytes
+// nextNonce creates a new, unique nonce.
+// The returned nonce is the little-endian byte representation of a nonce counter.
+// In case the nonce is longer than 8 bytes the remaining capacity is filled with random bytes
 func (t *Transformer) nextNonce(buf []byte) error {
 
 	// atomically get next nonce counter

@@ -83,27 +83,8 @@ BatchLoop:
 			}
 			go func() {
 				buf = buf[:length]
-				dstIP, err := r.getDestIP(buf)
-				if err != nil {
-					// Release buffer back to free buffer pool
-					iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
-					// FIXME(kormat): replace with metric.
-					r.log.Error("EgressReader: unable to get dest IP", "err", err)
-					//continue
-					return
-				}
-				srcIP, err := r.getSrcIP(buf)
-				if err != nil {
-					// Release buffer back to free buffer pool
-					iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
-					// FIXME(kormat): replace with metric.
-					r.log.Error("EgressReader: unable to get src IP", "err", err)
-					//continue
-					return
-				}
-				pkt := zoning.Packet{srcIP, dstIP, buf}
-				pkt, err = r.pipeline.Handle(pkt)
 
+				pkt, err := r.pipeline.Handle(zoning.Packet{RawPacket: buf})
 				if err != nil {
 					// Release buffer back to free buffer pool
 					iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
@@ -113,12 +94,12 @@ BatchLoop:
 					return
 				}
 
-				dstIA, dstRing := router.NetMap.Lookup(dstIP)
+				dstIA, dstRing := router.NetMap.Lookup(pkt.DstIP)
 				if dstRing == nil {
 					// Release buffer back to free buffer pool
 					iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
 					metrics.PktUnroutable.Inc()
-					r.log.Error("EgressReader: unable to find dest IA", "ip", dstIP)
+					r.log.Error("EgressReader: unable to find dest IA", "ip", pkt.DstIP)
 					//continue
 					return
 				}
