@@ -27,7 +27,7 @@ import (
 	"github.com/scionproto/scion/go/sig/zoning"
 )
 
-func Init(tunIO io.ReadWriteCloser, pipe zoning.Pipeline) {
+func Init(tunIO io.ReadWriteCloser, chain zoning.Chain) {
 	fatal.Check()
 	conn, err := sigcmn.Network.Listen(context.Background(), "udp",
 		&net.UDPAddr{IP: sigcmn.DataAddr, Port: sigcmn.DataPort}, addr.SvcNone)
@@ -35,7 +35,7 @@ func Init(tunIO io.ReadWriteCloser, pipe zoning.Pipeline) {
 		log.Crit("Unable to initialize ingress connection", "err", err)
 		fatal.Fatal(err)
 	}
-	d := NewDispatcher(tunIO, pipe, conn)
+	d := NewDispatcher(tunIO, chain, conn)
 	go func() {
 		defer log.HandlePanic()
 		if err := d.Run(); err != nil {

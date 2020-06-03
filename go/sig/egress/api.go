@@ -27,13 +27,13 @@ import (
 	"github.com/scionproto/scion/go/sig/zoning"
 )
 
-func Init(tunIO io.ReadWriteCloser, pipe zoning.Pipeline) {
+func Init(tunIO io.ReadWriteCloser, chain zoning.Chain) {
 	fatal.Check()
 	iface.Init()
 	// Spawn egress reader
 	go func() {
 		defer log.HandlePanic()
-		reader.NewReader(tunIO, pipe).Run()
+		reader.NewReader(tunIO, chain).Run()
 	}()
 }
 

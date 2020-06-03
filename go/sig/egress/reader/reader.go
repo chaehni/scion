@@ -42,13 +42,13 @@ const (
 )
 
 type Reader struct {
-	log      log.Logger
-	tunIO    io.ReadWriteCloser
-	pipeline zoning.Pipeline
+	log   log.Logger
+	tunIO io.ReadWriteCloser
+	chain zoning.Chain
 }
 
-func NewReader(tunIO io.ReadWriteCloser, pipe zoning.Pipeline) *Reader {
-	return &Reader{log: log.New(), tunIO: tunIO, pipeline: pipe}
+func NewReader(tunIO io.ReadWriteCloser, chain zoning.Chain) *Reader {
+	return &Reader{log: log.New(), tunIO: tunIO, chain: chain}
 }
 
 func (r *Reader) Run() {
@@ -84,7 +84,7 @@ BatchLoop:
 			go func() {
 				buf = buf[:length]
 
-				pkt, err := r.pipeline.Handle(zoning.Packet{RawPacket: buf})
+				pkt, err := r.chain.Handle(zoning.Packet{RawPacket: buf})
 				if err != nil {
 					// Release buffer back to free buffer pool
 					iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)

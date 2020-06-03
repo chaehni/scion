@@ -45,14 +45,14 @@ type Dispatcher struct {
 	workers            map[string]*Worker
 	extConn            *snet.Conn
 	tunIO              io.ReadWriteCloser
-	pipeline           zoning.Pipeline
+	chain              zoning.Chain
 	framesRecvCounters map[metrics.CtrPairKey]metrics.CtrPair
 }
 
-func NewDispatcher(tio io.ReadWriteCloser, pipe zoning.Pipeline, conn *snet.Conn) *Dispatcher {
+func NewDispatcher(tio io.ReadWriteCloser, chain zoning.Chain, conn *snet.Conn) *Dispatcher {
 	return &Dispatcher{
 		tunIO:              tio,
-		pipeline:           pipe,
+		chain:              chain,
 		extConn:            conn,
 		framesRecvCounters: make(map[metrics.CtrPairKey]metrics.CtrPair),
 		workers:            make(map[string]*Worker),
@@ -105,7 +105,7 @@ func (d *Dispatcher) dispatch(frame *FrameBuf, src *snet.UDPAddr) {
 	// Check if we already have a worker running and start one if not.
 	worker, ok := d.workers[dispatchStr]
 	if !ok {
-		worker = NewWorker(src, frame.sessId, d.tunIO, d.pipeline)
+		worker = NewWorker(src, frame.sessId, d.tunIO, d.chain)
 		d.workers[dispatchStr] = worker
 		go func() {
 			defer log.HandlePanic()

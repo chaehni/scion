@@ -112,10 +112,12 @@ func realMain() int {
 	egressChain := zoning.Chain{}
 	ingressChain := zoning.Chain{}
 	core := &zoning.CoreModule{}
+	ingressLog := &zoning.LogModule{Prefix: "ingress"}
+	egressLog := &zoning.LogModule{Prefix: "egress"}
 	//am := &auth.Module{}
 	tm := &transfer.Module{}
-	egressChain.Register(core, tm)
-	ingressChain.Register(tm, core)
+	egressChain.Register(core, egressLog, tm)
+	ingressChain.Register(tm, core, ingressLog)
 	/* End of Zoning */
 
 	egress.Init(tunIO, egressChain)
