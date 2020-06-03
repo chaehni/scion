@@ -39,6 +39,7 @@ type Packet struct {
 	DstHost   net.IP
 	SrcTP     net.IP
 	DstTP     net.IP
+	DstZone   common.RawBytes
 	RawPacket common.RawBytes
 }
 
