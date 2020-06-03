@@ -35,10 +35,15 @@ func (c *Chain) Handle(pkt Packet) (Packet, error) {
 
 // Packet contains a raw IP packet with additional meta data
 type Packet struct {
-	SrcIP     net.IP
-	DstIP     net.IP
+	SrcHost   net.IP
+	DstHost   net.IP
+	SrcTP     net.IP
+	DstTP     net.IP
 	RawPacket common.RawBytes
 }
+
+// NilPacket is the empty Packet
+var NilPacket = Packet{}
 
 // Module is a single element in the pipeline that handles IP packets
 // Modules must be thread safe

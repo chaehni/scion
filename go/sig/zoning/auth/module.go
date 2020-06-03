@@ -5,17 +5,32 @@ import "github.com/scionproto/scion/go/sig/zoning"
 // Module implements the authentication module
 // It transforms IP packets to and from intermediate representation
 type Module struct {
-	t       Transformer
+	t       *Transformer
 	ingress bool
+}
+
+// NewModule returns a new authentication module
+func NewModule(t *Transformer, ingress bool) *Module {
+	return &Module{
+		t:       t,
+		ingress: ingress,
+	}
 }
 
 // Handle handles individual IP packets, transforming them to/from intermediate representation
 func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
+	var err error
 	if m.ingress {
-		// decapsulate
+		_, pkt.RawPacket, err = m.t.FromIR(pkt.RawPacket)
+		if err != nil {
+			return zoning.NilPacket, err
+		}
+		return pkt, nil
 	} else {
-		// encapsulate
+		pkt.RawPacket, err = m.t.ToIR(pkt.RawPacket, []byte("12345678"))
+		if err != nil {
+			return zoning.NilPacket, err
+		}
+		return pkt, nil
 	}
-
-	return pkt, nil
 }

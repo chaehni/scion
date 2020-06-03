@@ -17,6 +17,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io"
@@ -45,6 +48,7 @@ import (
 	"github.com/scionproto/scion/go/sig/internal/sigconfig"
 	"github.com/scionproto/scion/go/sig/internal/xnet"
 	"github.com/scionproto/scion/go/sig/zoning"
+	"github.com/scionproto/scion/go/sig/zoning/auth"
 	"github.com/scionproto/scion/go/sig/zoning/transfer"
 )
 
@@ -114,10 +118,22 @@ func realMain() int {
 	core := &zoning.CoreModule{}
 	ingressLog := &zoning.LogModule{Prefix: "ingress"}
 	egressLog := &zoning.LogModule{Prefix: "egress"}
-	//am := &auth.Module{}
+	// static key for now until controller is ready
+	key, _ := hex.DecodeString("6368616e676520746869732070617373776f726420746f206120736563726574")
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err.Error())
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		panic(err.Error())
+	}
+	t := auth.NewTransformer(gcm)
+	ingressAuth := auth.NewModule(t, true)
+	egressAuth := auth.NewModule(t, false)
 	tm := &transfer.Module{}
-	egressChain.Register(core, egressLog, tm)
-	ingressChain.Register(tm, core, ingressLog)
+	egressChain.Register(core, egressLog, tm, egressAuth)
+	ingressChain.Register(ingressAuth, tm, core, ingressLog)
 	/* End of Zoning */
 
 	egress.Init(tunIO, egressChain)

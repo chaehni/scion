@@ -158,8 +158,9 @@ func (w *Worker) cleanup() {
 
 func (w *Worker) send(packet common.RawBytes) error {
 
-	pkt := zoning.Packet{nil, nil, packet}
-	w.chain.Handle(pkt)
+	pkt := zoning.Packet{nil, nil, w.Remote.Host.IP, nil, packet}
+	pkt, err := w.chain.Handle(pkt)
+	packet = pkt.RawPacket
 
 	bytesWritten, err := w.tunIO.Write(packet)
 	if err != nil {

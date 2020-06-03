@@ -18,7 +18,7 @@ func (m *LogModule) Handle(pkt Packet) (Packet, error) {
 	p := gopacket.NewPacket(pkt.RawPacket, layers.LayerTypeIPv4, gopacket.Default)
 	l4 := p.ApplicationLayer()
 	if l4 != nil {
-		fmt.Printf("[%v] %v ---> %v\nData: %v\n\n", pkt.SrcIP, pkt.DstIP, m.Prefix, string(l4.Payload()))
+		fmt.Printf("[%v] %v ---> %v\n%v\n", m.Prefix, pkt.SrcHost, pkt.DstHost, string(l4.Payload()))
 	}
 	return pkt, nil
 }

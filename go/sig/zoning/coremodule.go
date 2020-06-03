@@ -21,14 +21,14 @@ type CoreModule struct{}
 func (cm *CoreModule) Handle(pkt Packet) (Packet, error) {
 	dst, err := cm.getDestIP(pkt.RawPacket)
 	if err != nil {
-		return Packet{}, err
+		return NilPacket, err
 	}
 	src, err := cm.getSrcIP(pkt.RawPacket)
 	if err != nil {
-		return Packet{}, err
+		return NilPacket, err
 	}
-	pkt.DstIP = dst
-	pkt.SrcIP = src
+	pkt.DstHost = dst
+	pkt.SrcHost = src
 	return pkt, nil
 }
 

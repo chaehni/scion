@@ -93,13 +93,14 @@ BatchLoop:
 					//continue
 					return
 				}
+				buf = pkt.RawPacket
 
-				dstIA, dstRing := router.NetMap.Lookup(pkt.DstIP)
+				dstIA, dstRing := router.NetMap.Lookup(pkt.DstHost)
 				if dstRing == nil {
 					// Release buffer back to free buffer pool
 					iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
 					metrics.PktUnroutable.Inc()
-					r.log.Error("EgressReader: unable to find dest IA", "ip", pkt.DstIP)
+					r.log.Error("EgressReader: unable to find dest IA", "ip", pkt.DstHost)
 					//continue
 					return
 				}
