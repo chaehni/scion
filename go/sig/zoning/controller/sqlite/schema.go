@@ -15,28 +15,30 @@ const (
 
 	  CREATE TABLE Sites(
 		tp_address BLOB NOT NULL,
-		PRIMARY KEY(tp_address) ON CONFLICT REPLACE
+		name TEXT,
+		PRIMARY KEY(tp_address)
 	  );
 	  
 	  CREATE TABLE Subnets(
-		zone INTEGER NOT NULL,
 		net_ip BLOB NOT NULL,
 		net_mask BLOB NOT NULL,
+		zone INTEGER NOT NULL,
 		tp_address BLOB NOT NULL,
+		PRIMARY KEY (net_ip, net_mask),
 		FOREIGN KEY (zone) REFERENCES Zones(id) ON DELETE CASCADE,
-		FOREIGN KEY (tp_address) REFERENCES Sites(tp_address) ON DELETE CASCADE,
-		UNIQUE(net_ip, net_mask)
+		FOREIGN KEY (tp_address) REFERENCES Sites(tp_address) ON DELETE CASCADE
 	  );
 	  
-	  CREATE TABLE Transfer(
+	  CREATE TABLE Transfers(
 		src INTEGER NOT NULL,
 		dest INTEGER NOT NULL,
+		PRIMARY KEY (src, dest) ON CONFLICT REPLACE,
 		FOREIGN KEY (src) REFERENCES Zones(id) ON DELETE CASCADE,
-		FOREIGN KEY (dest) REFERENCES Zones(id) ON DELETE CASCADE,
-		PRIMARY KEY (src, dest) ON CONFLICT REPLACE
+		FOREIGN KEY (dest) REFERENCES Zones(id) ON DELETE CASCADE	
 	  )`
 
-	ZoneTable     = "Zones"
-	SubnetTable   = "Subnets"
-	TransferTable = "Transfers"
+	ZonesTable     = "Zones"
+	SitesTable     = "Sites"
+	SubnetsTable   = "Subnets"
+	TransfersTable = "Transfers"
 )

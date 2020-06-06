@@ -19,7 +19,7 @@ type Site struct {
 
 // Subnet is an IP subnet that is located behind a TP
 type Subnet struct {
-	//Zone   int // not needed as it lives inside a Zone struct
 	IPNet  net.IPNet
+	ZoneID int
 	TPAddr net.IP
 }
