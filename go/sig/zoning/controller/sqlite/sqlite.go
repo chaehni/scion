@@ -8,6 +8,7 @@ import (
 	"net"
 
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/sig/zoning/types"
 )
 
 // Backend wraps the database backend
@@ -224,24 +225,24 @@ func (b *Backend) DeleteTransfers(transfers map[int][]int) error {
 /* Getters */
 
 // GetAllSubnets returns all subnets stored in the backend
-func (b *Backend) GetAllSubnets() ([]*Subnet, error) {
+func (b *Backend) GetAllSubnets() ([]*types.Subnet, error) {
 	stmt := `SELECT net_ip, net_mask, zone, tp_address FROM Subnets`
 	rows, err := b.db.Query(stmt)
 	if err != nil {
 		return nil, err
 	}
 
-	var nets []*Subnet
+	var nets []*types.Subnet
 	var ip []byte
 	var mask []byte
-	var zone int
+	var zone types.ZoneID
 	var tp []byte
 	for rows.Next() {
 		err = rows.Scan(&ip, &mask, &zone, &tp)
 		if err != nil {
 			return nil, err
 		}
-		nets = append(nets, &Subnet{IPNet: net.IPNet{IP: ip, Mask: mask}, ZoneID: zone, TPAddr: tp})
+		nets = append(nets, &types.Subnet{IPNet: net.IPNet{IP: ip, Mask: mask}, ZoneID: zone, TPAddr: tp})
 	}
 	return nets, nil
 }

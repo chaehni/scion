@@ -36,7 +36,7 @@ func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
 		if err != nil {
 			return zoning.NilPacket, fmt.Errorf("[AuthIngress] verification failed: %v", err)
 		}
-		pkt.DstZone = ad[1:4]
+		pkt.RawDstZone = ad[1:4]
 		ts := time.Unix(int64(binary.LittleEndian.Uint32(ad[4:])), 0)
 		err = checkTime(ts)
 		if err != nil {
@@ -46,7 +46,7 @@ func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
 	} else {
 		ad = make([]byte, 8)
 		copy(ad[:1], version)
-		copy(ad[1:4], pkt.DstZone)
+		copy(ad[1:4], pkt.RawDstZone)
 		binary.LittleEndian.PutUint32(ad[4:], uint32(time.Now().Unix()))
 		pkt.RawPacket, err = m.t.ToIR(pkt.RawPacket, ad)
 		if err != nil {

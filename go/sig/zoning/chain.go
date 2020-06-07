@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/sig/zoning/types"
 )
 
 // Chain is a pipeline of modules which is traversed by each packet
@@ -35,12 +36,13 @@ func (c *Chain) Handle(pkt Packet) (Packet, error) {
 
 // Packet contains a raw IP packet with additional meta data
 type Packet struct {
-	SrcHost   net.IP
-	DstHost   net.IP
-	SrcTP     net.IP
-	DstTP     net.IP
-	DstZone   common.RawBytes
-	RawPacket common.RawBytes
+	SrcHost    net.IP
+	DstHost    net.IP
+	SrcTP      net.IP
+	DstTP      net.IP
+	DstZone    types.ZoneID
+	RawDstZone common.RawBytes
+	RawPacket  common.RawBytes
 }
 
 // NilPacket is the empty Packet

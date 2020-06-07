@@ -131,7 +131,10 @@ func realMain() int {
 	t := auth.NewTransformer(gcm)
 	ingressAuth := auth.NewModule(t, true)
 	egressAuth := auth.NewModule(t, false)
-	tm := &transfer.Module{}
+	tm, err := transfer.New(":8080", "zoning/controller/certs/client_cert.pem", "zoning/controller/certs/client_key.pem")
+	if err != nil {
+		panic(err)
+	}
 	egressChain.Register(core, egressLog, tm, egressAuth)
 	ingressChain.Register(ingressAuth, tm, core, ingressLog)
 	/* End of Zoning */
