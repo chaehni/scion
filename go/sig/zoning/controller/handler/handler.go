@@ -128,15 +128,19 @@ func setupDB() *sqlite.Backend {
 		panic(err)
 	}
 
-	err = db.InsertSite(net.ParseIP("8.8.9.8"), "Main DC")
+	err = db.InsertSite(net.ParseIP("172.16.0.11"), "Site A")
 	if err != nil {
 		panic(err)
 	}
-	err = db.InsertSubnet(1, net.IPNet{IP: net.ParseIP("1.1.1.1"), Mask: net.IPv4Mask(255, 255, 255, 0)}, net.ParseIP("8.8.9.8"))
+	err = db.InsertSite(net.ParseIP("172.16.0.12"), "Site B")
 	if err != nil {
 		panic(err)
 	}
-	err = db.InsertSubnet(345, net.IPNet{IP: net.ParseIP("1.2.3.4"), Mask: net.IPv4Mask(255, 0, 255, 0)}, net.ParseIP("8.8.9.8"))
+	err = db.InsertSubnet(1, net.IPNet{IP: net.ParseIP("172.16.11.0"), Mask: net.IPv4Mask(255, 255, 255, 0)}, net.ParseIP("172.16.0.11"))
+	if err != nil {
+		panic(err)
+	}
+	err = db.InsertSubnet(1, net.IPNet{IP: net.ParseIP("172.16.12.0"), Mask: net.IPv4Mask(255, 255, 255, 0)}, net.ParseIP("172.16.0.12"))
 	if err != nil {
 		panic(err)
 	}
