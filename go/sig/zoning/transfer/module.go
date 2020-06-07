@@ -117,7 +117,7 @@ func (m *Module) fetchInfo() error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	// TODO: make an API package and read routes from there
-	resp, err := m.client.Get(fmt.Sprintf("https://%s/get-subnets", m.controllerAddr))
+	resp, err := m.client.Get(fmt.Sprintf("https://%s/api/get-subnets", m.controllerAddr))
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (m *Module) fetchInfo() error {
 		return err
 	}
 
-	resp, err = m.client.Get(fmt.Sprintf("https://%s/get-transfers", m.controllerAddr))
+	resp, err = m.client.Get(fmt.Sprintf("https://%s/api/get-transfers", m.controllerAddr))
 	if err != nil {
 		return err
 	}
