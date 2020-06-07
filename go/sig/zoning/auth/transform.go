@@ -85,8 +85,8 @@ func (t *Transformer) ToIR(packet, additionalData []byte) ([]byte, error) {
 
 // FromIR transforms data back to an IP packet
 func (t *Transformer) FromIR(message []byte) (additionalData []byte, packet []byte, err error) {
-
 	nonceSize := t.aead.NonceSize()
+	//TODO: check message size before slicing
 	nonce, additionalData, cipher := message[:nonceSize], message[nonceSize:nonceSize+headerLength], message[nonceSize+headerLength:]
 	plaintext, err := t.aead.Open(cipher[:0], nonce, cipher, additionalData)
 	if err != nil {
