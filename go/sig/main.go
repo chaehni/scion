@@ -136,7 +136,7 @@ func realMain() int {
 		panic(err)
 	}
 	egressChain.Register(core, egressLog, tm, egressAuth)
-	ingressChain.Register(ingressAuth, tm, core, ingressLog)
+	ingressChain.Register(ingressAuth, core, tm, ingressLog)
 	/* End of Zoning */
 
 	egress.Init(tunIO, egressChain)
