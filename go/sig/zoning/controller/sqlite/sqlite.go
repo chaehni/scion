@@ -224,10 +224,26 @@ func (b *Backend) DeleteTransfers(transfers map[int][]int) error {
 
 /* Getters */
 
-// GetAllSubnets returns all subnets stored in the backend
-func (b *Backend) GetAllSubnets() ([]*types.Subnet, error) {
-	stmt := `SELECT net_ip, net_mask, zone, tp_address FROM Subnets`
-	rows, err := b.db.Query(stmt)
+// GetSubnets returns all subnets stored in the backend relevant for ZTP with address tpAddr
+func (b *Backend) GetSubnets(tpAddr net.IP) ([]*types.Subnet, error) {
+	stmt := `WITH tp_zones
+	AS (SELECT DISTINCT zone 
+		FROM   subnets 
+		WHERE  tp_address = ?), 
+	possible_dests 
+	AS (SELECT DISTINCT dest
+		FROM   transfers 
+		WHERE  src IN tp_zones AND dest NOT IN tp_zones), 
+	possible_src 
+	AS (SELECT DISTINCT src
+		FROM  transfers 
+		WHERE  dest IN tp_zones AND src NOT IN tp_zones) 
+	SELECT net_ip, net_mask, zone, tp_address 
+	FROM   subnets 
+	WHERE  zone IN tp_zones OR zone IN possible_dests
+	   OR zone IN possible_src`
+
+	rows, err := b.db.Query(stmt, tpAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -247,10 +263,18 @@ func (b *Backend) GetAllSubnets() ([]*types.Subnet, error) {
 	return nets, nil
 }
 
-// GetAllTransfers returns all allowed transfers stored in the backend
-func (b *Backend) GetAllTransfers() (map[int][]int, error) {
-	stmt := `SELECT src, dest FROM Transfers`
-	rows, err := b.db.Query(stmt)
+// GetTransfers returns all allowed transfers stored in the backend
+func (b *Backend) GetTransfers(tpAddr net.IP) (map[int][]int, error) {
+	stmt := `WITH relevant_zones 
+	AS (SELECT DISTINCT zone 
+		FROM   subnets 
+		WHERE  tp_address = ?) 
+	SELECT src, dest 
+	FROM   transfers 
+	WHERE  src IN relevant_zones 
+	   OR dest IN relevant_zones`
+
+	rows, err := b.db.Query(stmt, tpAddr)
 	if err != nil {
 		return nil, err
 	}
