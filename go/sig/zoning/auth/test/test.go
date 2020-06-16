@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
+	"time"
 
 	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/snet"
@@ -80,32 +82,54 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	keyman := auth.NewKeyMan(network, local)
+	keyman := auth.NewKeyMan([]byte("KEY"), network, local)
 	//remote, err := snet.ParseUDPAddr("17-ffaa:1:89,127.0.0.1:9090")
 	if err != nil {
 		panic(err)
 	}
-	wg := sync.WaitGroup{}
 
 	go func() {
 		keyman.ServeL1()
-		//	wg.Done()
 	}()
+
+	wg := sync.WaitGroup{}
+
+	start := time.Now()
 	for i := 0; i < 1000; i++ {
 		go func() {
 			wg.Add(1)
-			for i := 0; i < 10000; i++ {
+			for i := 0; i < 1000; i++ {
 				_, err := keyman.FetchL1Key("17-ffaa:1:89,127.0.0.1")
 				if err != nil {
 					panic(err)
 				}
+				//fmt.Printf("%+v\n", k)
 			}
-			//fmt.Printf("%+v\n", k)
 			wg.Done()
 		}()
 	}
 	wg.Wait()
-	fmt.Println("done")
+	elapsed := time.Since(start)
+	log.Printf("Fetch took %s", elapsed)
+
+	start = time.Now()
+	for i := 0; i < 1000; i++ {
+		go func() {
+			wg.Add(1)
+			for i := 0; i < 1000; i++ {
+				_, err := keyman.DeriveL1Key("17-ffaa:1:89,127.0.0.1")
+				if err != nil {
+					panic(err)
+				}
+				//fmt.Printf("%+v\n", k)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	elapsed = time.Since(start)
+	log.Printf("Derive took %s", elapsed)
 
 	//time.Sleep(time.Minute)
 	//wg.Wait()
