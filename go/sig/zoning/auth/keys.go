@@ -6,14 +6,17 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"io"
-	"net"
 	"sync"
 	"time"
 
+	"github.com/lucas-clemente/quic-go"
+	"github.com/scionproto/scion/go/lib/addr"
+
 	"github.com/dchest/cmac"
 	"github.com/scionproto/scion/go/lib/log"
+	"github.com/scionproto/scion/go/lib/snet"
+	"github.com/scionproto/scion/go/lib/snet/squic"
 )
 
 var keyLength = 128
@@ -22,8 +25,8 @@ var keyTTL = 24 * time.Hour
 // keyManager implements a thread-safe store managing L0 and L1 keys
 type keyManager interface {
 	getL0Key() (*Key, error)
-	fetchL1Key(remote net.IP) (*Key, error)
-	deriveL1Key(remote net.IP) (*Key, error)
+	fetchL1Key(remote *snet.UDPAddr) (*Key, error)
+	deriveL1Key(remote *snet.UDPAddr) (*Key, error)
 }
 
 var _ = keyManager(&keyMan{})
@@ -38,13 +41,15 @@ type Key struct {
 type keyMan struct {
 	// represents the l0 key, clients should never directly access this key
 	// instead they should use the getL0Key() function
-	l0             *Key
-	l0Lock         sync.RWMutex
-	keyCache       map[string]*Key // TODO: in case of poor performance replace this with a sync.Map
-	keyCacheLock   sync.RWMutex
-	localAddr      string
+	l0           *Key
+	l0Lock       sync.RWMutex
+	keyCache     map[snet.UDPAddr]*Key // TODO: in case of poor performance replace this with a sync.Map
+	keyCacheLock sync.RWMutex
+	//sciond         string
+	localAddr      snet.UDPAddr
 	tlsServerConf  *tls.Config
 	tlsClientrConf *tls.Config
+	SCIONNet       *snet.SCIONNetwork
 }
 
 func (km *keyMan) getL0Key() (*Key, error) {
@@ -81,39 +86,65 @@ func (km *keyMan) refreshL0() error {
 	return nil
 }
 
-func (km *keyMan) fetchL1Key(remote net.IP) (*Key, error) {
+func (km *keyMan) fetchL1Key(remote *snet.UDPAddr) (*Key, error) {
 	// fetch key in case it is missing or has expired
-	k, ok := km.keyCache[remote.To16().String()]
+	k, ok := km.keyCache[*remote]
 	if !ok || k.TTL.After(time.Now()) {
-		err := km.fetchL1FromRemote(remote.To16())
+		err := km.fetchL1FromRemote(remote)
 		if err != nil {
 			return nil, err
 		}
 	}
 	km.keyCacheLock.RLock()
 	defer km.keyCacheLock.RUnlock()
-	l1 := km.keyCache[remote.To16().String()]
+	l1 := km.keyCache[*remote]
 	key := make([]byte, keyLength)
 	copy(key, l1.Key)
 	return &Key{Key: key, TTL: l1.TTL}, nil
 }
 
-func (km *keyMan) fetchL1FromRemote(remote net.IP) error {
+func (km *keyMan) fetchL1FromRemote(remote *snet.UDPAddr) error {
 	km.keyCacheLock.Lock()
 	defer km.keyCacheLock.Unlock()
 	// check again if key indeed is missing or is expired in case multiple goroutines entered the function
-	k, ok := km.keyCache[remote.String()]
+	k, ok := km.keyCache[*remote]
 	if ok && k.TTL.Before(time.Now()) {
 		return nil
 	}
-	// fetch key from remote
-	conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%s", remote.String(), "9090"), km.tlsClientrConf)
+
+	// set up connection
+	/* ds := reliable.NewDispatcher("")
+	sciondConn, err := sciond.NewService("").Connect(context.Background())
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	localIA, err := sciondConn.LocalIA(context.Background())
+	if err != nil {
+		return err
+	}
+	pathQuerier := sciond.Querier{Connector: sciondConn, IA: localIA}
+	network := snet.NewNetworkWithPR(localIA, ds, pathQuerier, sciond.RevHandler{Connector: sciondConn})
+	if err != nil {
+		return err
+	}
+	err = squic.Init("", "")
+	if err != nil {
+		return err
+	} */
+	sess, err := squic.Dial(km.SCIONNet, km.localAddr.Host, remote, addr.SvcNone, nil)
+	if err != nil {
+		return err
+	}
+	defer sess.Close()
+	stream, err := sess.OpenStreamSync()
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+
+	// fetch key
 	var b bytes.Buffer
-	_, err = io.Copy(&b, conn)
+	_, err = io.Copy(&b, stream)
 	if err != nil {
 		return err
 	}
@@ -122,11 +153,11 @@ func (km *keyMan) fetchL1FromRemote(remote net.IP) error {
 	if err != nil {
 		return err
 	}
-	km.keyCache[remote.String()] = &l1
+	km.keyCache[*remote] = &l1
 	return nil
 }
 
-func (km *keyMan) deriveL1Key(remote net.IP) (*Key, error) {
+func (km *keyMan) deriveL1Key(remote *snet.UDPAddr) (*Key, error) {
 	l0, err := km.getL0Key()
 	if err != nil {
 		return nil, err
@@ -139,32 +170,34 @@ func (km *keyMan) deriveL1Key(remote net.IP) (*Key, error) {
 	if err != nil {
 		return nil, err
 	}
-	mac.Write(remote)
+	io.WriteString(mac, remote.String())
 	return &Key{Key: mac.Sum(nil), TTL: l0.TTL}, nil
 }
 
 func (km *keyMan) serveL1() error {
-	l, err := tls.Listen("tcp", km.localAddr, km.tlsServerConf)
+	l, err := squic.Listen(km.SCIONNet, km.localAddr.Host, addr.SvcNone, nil)
 	if err != nil {
 		return err
 	}
 	for {
-		conn, err := l.Accept()
+		sess, err := l.Accept()
 		if err != nil {
-			log.Warn("[AuthModule Listener] failed to accept incoming connection %v", err)
+			log.Warn("[AuthModule Listener] failed to accept incoming session %v", err)
 		}
-		go func(conn net.Conn) {
-			defer conn.Close()
-			remote, _, err := net.SplitHostPort(conn.RemoteAddr().String())
+		go func(sess quic.Session) {
+			defer sess.Close()
+			stream, err := sess.AcceptStream()
 			if err != nil {
-				log.Warn("[AuthModule Listener] failed get remote IP: %v", err)
+				log.Warn("[AuthModule Listener] failed accetp incoming stream %v", err)
 			}
-			ip := net.ParseIP(remote).To16()
-			if ip == nil {
-				log.Warn("[AuthModule Listener] failed parse remote IP: %v", err)
-			}
+			defer stream.Close()
+
 			// derive the L1 Key
-			l1, err := km.deriveL1Key(ip)
+			remoteAddr, ok := sess.RemoteAddr().(*snet.UDPAddr)
+			if !ok {
+				log.Warn("[AuthModule Listener] failed assert remote UDPAddr: %v", err)
+			}
+			l1, err := km.deriveL1Key(remoteAddr)
 			if err != nil {
 				log.Warn("[AuthModule] failed to derive L1 key: %v", err)
 			}
@@ -173,8 +206,8 @@ func (km *keyMan) serveL1() error {
 			if err != nil {
 				log.Warn("[AuthModule] failed marshal L1 key: %v", err)
 			}
-			conn.Write(enc)
-		}(conn)
+			stream.Write(enc)
+		}(sess)
 	}
 }
 
