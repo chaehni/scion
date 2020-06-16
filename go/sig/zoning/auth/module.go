@@ -15,13 +15,15 @@ var maxTimeDiff = 1 * time.Second
 // Module implements the authentication module
 // It transforms IP packets to and from intermediate representation
 type Module struct {
-	t       *Transformer
+	km      KeyManager
+	t       Transformer
 	ingress bool
 }
 
 // NewModule returns a new authentication module
-func NewModule(t *Transformer, ingress bool) *Module {
+func NewModule(km KeyManager, t Transformer, ingress bool) *Module {
 	return &Module{
+		km:      km,
 		t:       t,
 		ingress: ingress,
 	}

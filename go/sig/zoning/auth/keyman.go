@@ -3,7 +3,6 @@ package auth
 import (
 	"crypto/aes"
 	"crypto/sha256"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,11 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dchest/cmac"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/lib/snet/squic"
 
+	"github.com/dchest/cmac"
 	"github.com/lucas-clemente/quic-go"
 	"github.com/patrickmn/go-cache"
 	"github.com/scionproto/scion/go/lib/addr"
@@ -27,42 +26,26 @@ import (
 var keyLength = 16
 var keyTTL = 24 * time.Hour
 var keyPurgeInterval = 24 * time.Hour
-var errorNoError quic.ErrorCode = 0x100
 var l0Salt = []byte("L0 Salt value")
 
-// KeyManager is a thread-safe key store managing L0 and L1 keys
-type KeyManager interface {
-	GetL0Key() (Key, error)
-	FetchL1Key(remote string) (Key, error)
-	DeriveL1Key(remote string) (Key, error)
+// KeyPld is the payload sent to other ZTPs carrying the key
+type KeyPld struct {
+	Key []byte
+	TTL time.Time
 }
 
 var _ = KeyManager(&KeyMan{})
 
-// Key contains a key toghether with its time-to-live
-type Key []byte
-
-// KeyPld is the payload sent to other ZTPs carrying the key
-type KeyPld struct {
-	Key Key
-	TTL time.Time
-}
-
-// KeyMan implements KeyManager
+// KeyMan implements KeyManager interface
 type KeyMan struct {
-	// represents the l0 key, clients should never directly access this key
-	// instead they should use the getL0Key() function
-	ms             []byte
-	l0             Key
-	l0TTL          time.Time
-	l0Lock         sync.RWMutex
-	keyCache       *cache.Cache
-	keyCacheLock   sync.RWMutex
-	scionNet       *snet.SCIONNetwork
-	listenAddr     *snet.UDPAddr
-	tlsServerConf  *tls.Config
-	tlsClientrConf *tls.Config
-	reqLock        sync.Mutex
+	ms         []byte
+	l0         []byte
+	l0TTL      time.Time
+	l0Lock     sync.RWMutex
+	keyCache   *cache.Cache
+	scionNet   *snet.SCIONNetwork
+	listenAddr *snet.UDPAddr
+	reqLock    sync.Mutex
 }
 
 // NewKeyMan creates a new Keyman
@@ -83,7 +66,7 @@ func (km *KeyMan) UpdateMS(masterSecret []byte) {
 }
 
 // GetL0Key atomically gets the Level-0 key
-func (km *KeyMan) GetL0Key() (Key, error) {
+func (km *KeyMan) GetL0Key() ([]byte, error) {
 	key, _, err := km.getL0Key()
 	if err != nil {
 		return nil, err
@@ -91,7 +74,7 @@ func (km *KeyMan) GetL0Key() (Key, error) {
 	return key, nil
 }
 
-func (km *KeyMan) getL0Key() (Key, time.Time, error) {
+func (km *KeyMan) getL0Key() ([]byte, time.Time, error) {
 	// create new key in case we don't have a key yet or current key has expired
 	if km.l0 == nil || km.l0TTL.Before(time.Now()) {
 		err := km.refreshL0()
@@ -126,7 +109,7 @@ func (km *KeyMan) refreshL0() error {
 
 // FetchL1Key fetches the Level-1 key used to send traffic to a remote ZTP.
 // In case the key is not cached or expired it is fetched from remote.
-func (km *KeyMan) FetchL1Key(remote string) (Key, error) {
+func (km *KeyMan) FetchL1Key(remote string) ([]byte, error) {
 	if remote == "" {
 		return nil, errors.New("remote cannot be nil")
 	}
@@ -140,9 +123,9 @@ func (km *KeyMan) FetchL1Key(remote string) (Key, error) {
 	}
 	x, _, ok := km.keyCache.GetWithExpiration(remote)
 	if !ok {
-		return nil, errors.New("fetching key failed") // Should never happen
+		return nil, errors.New("fetching key failed") // Should never happen, we just fetched it
 	}
-	l1 := x.(Key)
+	l1 := x.([]byte)
 	key := make([]byte, keyLength)
 	copy(key, l1)
 	return key, nil
@@ -198,7 +181,7 @@ func (km *KeyMan) fetchL1FromRemote(remote string) error {
 }
 
 // DeriveL1Key derives the Level-1 key used to verify incoming traffic
-func (km *KeyMan) DeriveL1Key(remote string) (Key, error) {
+func (km *KeyMan) DeriveL1Key(remote string) ([]byte, error) {
 	k, _, err := km.deriveL1Key(remote)
 	if err != nil {
 		return nil, err
@@ -206,7 +189,7 @@ func (km *KeyMan) DeriveL1Key(remote string) (Key, error) {
 	return k, nil
 }
 
-func (km *KeyMan) deriveL1Key(remote string) (Key, time.Time, error) {
+func (km *KeyMan) deriveL1Key(remote string) ([]byte, time.Time, error) {
 	l0, t, err := km.getL0Key()
 	if err != nil {
 		return nil, time.Time{}, err

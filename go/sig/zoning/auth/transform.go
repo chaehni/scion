@@ -32,8 +32,10 @@ import (
 
 var headerLength = 8
 
-// Transformer transforms IP packets to and from intermediate representation
-type Transformer struct {
+var _ = Transformer(&TR{})
+
+// TR implements the Transformer interface
+type TR struct {
 	aead        cipher.AEAD
 	nonceCtr    uint64
 	maxNonceCtr uint64
@@ -41,7 +43,7 @@ type Transformer struct {
 }
 
 // NewTransformer creates a new Transformer
-func NewTransformer(aead cipher.AEAD) *Transformer {
+func NewTransformer(aead cipher.AEAD) *TR {
 
 	var maxCtr uint64
 	if aead.NonceSize() >= 8 {
@@ -50,7 +52,7 @@ func NewTransformer(aead cipher.AEAD) *Transformer {
 		maxCtr = uint64(1<<(aead.NonceSize()*8) - 1)
 	}
 
-	return &Transformer{
+	return &TR{
 		aead:        aead,
 		nonceCtr:    0,
 		maxNonceCtr: maxCtr,
@@ -59,12 +61,12 @@ func NewTransformer(aead cipher.AEAD) *Transformer {
 
 // Overhead is the number of additional bytes added to the original IP
 // packet when transformed to intermediate representation.
-func (t *Transformer) Overhead() int {
+func (t *TR) Overhead() int {
 	return t.aead.NonceSize() + t.aead.Overhead() + headerLength
 }
 
 // ToIR transforms an IP packet to intermediate representation
-func (t *Transformer) ToIR(packet, additionalData []byte) ([]byte, error) {
+func (t *TR) ToIR(packet, additionalData []byte) ([]byte, error) {
 
 	// pre-allocating a buffer which can accomodate nonce, additionalData, ciphertext and tag
 	// makes sure encryption does not copy data unnecessarily
@@ -84,7 +86,7 @@ func (t *Transformer) ToIR(packet, additionalData []byte) ([]byte, error) {
 }
 
 // FromIR transforms data back to an IP packet
-func (t *Transformer) FromIR(message []byte) (additionalData []byte, packet []byte, err error) {
+func (t *TR) FromIR(message []byte) (additionalData []byte, packet []byte, err error) {
 	nonceSize := t.aead.NonceSize()
 	//TODO: check message size before slicing
 	nonce, additionalData, cipher := message[:nonceSize], message[nonceSize:nonceSize+headerLength], message[nonceSize+headerLength:]
@@ -96,14 +98,14 @@ func (t *Transformer) FromIR(message []byte) (additionalData []byte, packet []by
 }
 
 // UpdateKey updates the key for the encryption used by Transformer
-func (t *Transformer) UpdateKey() error {
+func (t *TR) UpdateKey() error {
 	return errors.New("not implemented")
 }
 
 // nextNonce creates a new, unique nonce.
 // The returned nonce is the little-endian byte representation of a nonce counter.
 // In case the nonce is longer than 8 bytes the remaining capacity is filled with random bytes
-func (t *Transformer) nextNonce(buf []byte) error {
+func (t *TR) nextNonce(buf []byte) error {
 
 	// atomically get next nonce counter
 	for {
