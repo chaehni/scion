@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"crypto/aes"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -16,7 +15,6 @@ import (
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/lib/snet/squic"
 
-	"github.com/dchest/cmac"
 	"github.com/lucas-clemente/quic-go"
 	"github.com/patrickmn/go-cache"
 	"github.com/scionproto/scion/go/lib/addr"
@@ -172,6 +170,7 @@ func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
 	if l1.TTL.Before(time.Now()) {
 		return false, errors.New("fetched key is expired")
 	}
+	log.Debug("[AuthModule Fetcher] successfully fetched L1 key from", "remote", remoteAddr)
 
 	// set key with TTL
 	km.keyCache.Set(remote, l1.Key, l1.TTL.Sub(time.Now()))
@@ -192,11 +191,7 @@ func (km *KeyMan) deriveL1Key(remote string) ([]byte, time.Time, error) {
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	block, err := aes.NewCipher(l0)
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	mac, err := cmac.New(block)
+	mac, err := initMac(l0)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
@@ -229,6 +224,8 @@ func (km *KeyMan) ServeL1() error {
 				log.Warn("[AuthModule Listener] failed assert remote UDPAddr", "err", err)
 				return
 			}
+
+			log.Debug("[AuthModule Listener] L1 key request from", "remote", remoteAddr)
 
 			// derive L1 key
 			k, t, err := km.deriveL1Key(fmt.Sprintf("%s,%s", remoteAddr.IA, remoteAddr.Host.IP))

@@ -2,7 +2,6 @@ package zoning
 
 import (
 	"net"
-	"sync"
 
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/sig/zoning/types"
@@ -11,13 +10,13 @@ import (
 // Chain is a pipeline of modules which is traversed by each packet
 type Chain struct {
 	modules []Module
-	mutex   sync.Mutex
+	//mutex   sync.Mutex
 }
 
 // Register adds the passed modules to the Pipeline in the same order they are provided in the argument
 func (c *Chain) Register(m ...Module) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	/* 	c.mutex.Lock()
+	   	defer c.mutex.Unlock() */
 	c.modules = append(c.modules, m...)
 }
 
@@ -38,8 +37,8 @@ func (c *Chain) Handle(pkt Packet) (Packet, error) {
 type Packet struct {
 	SrcHost    net.IP
 	DstHost    net.IP
-	SrcTP      net.IP
-	DstTP      net.IP
+	SrcTP      net.Addr
+	DstTP      net.Addr
 	DstZone    types.ZoneID
 	RawDstZone common.RawBytes
 	RawPacket  common.RawBytes

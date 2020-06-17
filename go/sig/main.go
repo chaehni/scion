@@ -17,9 +17,7 @@ package main
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
-	"encoding/hex"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -37,9 +35,13 @@ import (
 	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/prom"
+	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/serrors"
 	"github.com/scionproto/scion/go/lib/sigdisp"
 	"github.com/scionproto/scion/go/lib/sigjson"
+	"github.com/scionproto/scion/go/lib/snet"
+	"github.com/scionproto/scion/go/lib/snet/squic"
+	"github.com/scionproto/scion/go/lib/sock/reliable"
 	"github.com/scionproto/scion/go/sig/egress"
 	"github.com/scionproto/scion/go/sig/internal/base"
 	"github.com/scionproto/scion/go/sig/internal/ingress"
@@ -118,19 +120,34 @@ func realMain() int {
 	core := &zoning.CoreModule{}
 	ingressLog := &zoning.LogModule{Prefix: "ingress"}
 	egressLog := &zoning.LogModule{Prefix: "egress"}
-	// static key for now until controller is ready
-	key, _ := hex.DecodeString("6368616e676520746869732070617373776f726420746f206120736563726574")
-	block, err := aes.NewCipher(key)
+
+	ds := reliable.NewDispatcher("")
+	sciondConn, err := sciond.NewService(sciond.DefaultSCIONDAddress).Connect(context.Background())
 	if err != nil {
-		panic(err.Error())
+		fmt.Println(err)
 	}
-	gcm, err := cipher.NewGCM(block)
+	localIA, err := sciondConn.LocalIA(context.Background())
 	if err != nil {
-		panic(err.Error())
+		fmt.Println(err)
 	}
-	t := auth.NewTransformer(gcm)
-	ingressAuth := auth.NewModule(t, true)
-	egressAuth := auth.NewModule(t, false)
+	pathQuerier := sciond.Querier{Connector: sciondConn, IA: localIA}
+	network := snet.NewNetworkWithPR(localIA, ds, pathQuerier, sciond.RevHandler{Connector: sciondConn})
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = squic.Init("", "")
+	if err != nil {
+		panic(err)
+	}
+
+	local, _ := snet.ParseUDPAddr("17-ffaa:1:89,127.0.0.1:9090")
+	if err != nil {
+		panic(err)
+	}
+	keyman := auth.NewKeyMan([]byte("KEY"), network, local)
+
+	ingressAuth := auth.NewModule(keyman, true)
+	egressAuth := auth.NewModule(keyman, false)
 	tm, err := transfer.New(":8080", "zoning/controller/certs/client_cert.pem", "zoning/controller/certs/client_key.pem")
 	if err != nil {
 		panic(err)

@@ -42,8 +42,12 @@ type TR struct {
 	mutex       sync.Mutex
 }
 
-// NewTransformer creates a new Transformer
-func NewTransformer(aead cipher.AEAD) *TR {
+// NewTR creates a new Transformer
+func NewTR(key []byte) (*TR, error) {
+	aead, err := newAEAD(key)
+	if err != nil {
+		return nil, err
+	}
 
 	var maxCtr uint64
 	if aead.NonceSize() >= 8 {
@@ -56,7 +60,7 @@ func NewTransformer(aead cipher.AEAD) *TR {
 		aead:        aead,
 		nonceCtr:    0,
 		maxNonceCtr: maxCtr,
-	}
+	}, nil
 }
 
 // Overhead is the number of additional bytes added to the original IP

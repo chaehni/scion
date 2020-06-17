@@ -4,9 +4,20 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"net"
 	"time"
 
+	"github.com/patrickmn/go-cache"
+	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/sig/zoning"
+)
+
+const (
+	ip4Ver    = 0x4
+	ip6Ver    = 0x6
+	ip4SrcOff = 12
+	ip4DstOff = 16
+	ip6DstOff = 24
 )
 
 var version = []byte("1")
@@ -16,25 +27,32 @@ var maxTimeDiff = 1 * time.Second
 // It transforms IP packets to and from intermediate representation
 type Module struct {
 	km      KeyManager
-	t       Transformer
+	tmap    *cache.Cache
 	ingress bool
 }
 
 // NewModule returns a new authentication module
-func NewModule(km KeyManager, t Transformer, ingress bool) *Module {
+func NewModule(km KeyManager, ingress bool) *Module {
 	return &Module{
 		km:      km,
-		t:       t,
 		ingress: ingress,
+		tmap:    cache.New(cache.NoExpiration, -1),
 	}
 }
 
 // Handle handles individual IP packets, transforming them to/from intermediate representation
 func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
-	var err error
 	var ad []byte
 	if m.ingress {
-		ad, pkt.RawPacket, err = m.t.FromIR(pkt.RawPacket)
+		key, err := m.km.DeriveL1Key(pkt.SrcTP.String())
+		if err != nil {
+			return zoning.NilPacket, fmt.Errorf("[AuthIngress] key derivation failed: %v", err)
+		}
+		tr, err := NewTR(key)
+		if err != nil {
+			return zoning.NilPacket, fmt.Errorf("[AuthIngress] could not create transformer: %v", err)
+		}
+		ad, pkt.RawPacket, err = tr.FromIR(pkt.RawPacket)
 		if err != nil {
 			return zoning.NilPacket, fmt.Errorf("[AuthIngress] verification failed: %v", err)
 		}
@@ -45,16 +63,47 @@ func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
 			return zoning.NilPacket, fmt.Errorf("[AuthIngress] verification failed: %v", err)
 		}
 		return pkt, nil
+
 	} else {
 		ad = make([]byte, 8)
 		copy(ad[:1], version)
 		copy(ad[1:4], pkt.RawDstZone)
 		binary.LittleEndian.PutUint32(ad[4:], uint32(time.Now().Unix()))
-		pkt.RawPacket, err = m.t.ToIR(pkt.RawPacket, ad)
+
+		key, fresh, err := m.km.FetchL1Key(pkt.DstTP.String())
 		if err != nil {
-			return zoning.NilPacket, fmt.Errorf("[AuthIngress] proof creation failed: %v", err)
+			return zoning.NilPacket, fmt.Errorf("[AuthEgress] fetching L1 key failed: %v", err)
+		}
+		if fresh {
+			tr, err := NewTR(key)
+			if err != nil {
+				// how to handler?
+				return zoning.NilPacket, err
+			}
+			m.tmap.Set(pkt.DstTP.String(), tr, -1)
+		}
+		tr, ok := m.tmap.Get(pkt.DstTP.String())
+		if !ok {
+			return zoning.NilPacket, fmt.Errorf("[AuthEgress] transformer not found in cache: %v", err)
+		}
+		pkt.RawPacket, err = tr.(*TR).ToIR(pkt.RawPacket, ad)
+		if err != nil {
+			return zoning.NilPacket, fmt.Errorf("[AuthEgress] proof creation failed: %v", err)
 		}
 		return pkt, nil
+	}
+}
+
+func (m *Module) getSrcIP(b common.RawBytes) (net.IP, error) {
+	ver := (b[0] >> 4)
+	switch ver {
+	case ip4Ver:
+		return net.IP(b[ip4SrcOff : ip4SrcOff+net.IPv4len]), nil
+	case ip6Ver:
+		return net.IP(b[ip6DstOff : ip6DstOff+net.IPv6len]), nil
+	default:
+		return nil, common.NewBasicError("Unsupported IP protocol version in egress packet", nil,
+			"type", ver)
 	}
 }
 
