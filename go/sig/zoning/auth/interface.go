@@ -2,8 +2,11 @@ package auth
 
 // KeyManager is a thread-safe key store managing L0 and L1 keys
 type KeyManager interface {
-	GetL0Key() ([]byte, error)
-	FetchL1Key(remote string) ([]byte, error)
+	// FetchL1Key fetches the level 1 key to be used to send data to remote.
+	// It returns the key and a bool indicating if the key cached key has exoured and a fresh key
+	// has been fetched from remote.
+	FetchL1Key(remote string) ([]byte, bool, error)
+	// Derive L1Key derives the level 1 key to be used to verify incoming traffic.
 	DeriveL1Key(remote string) ([]byte, error)
 }
 

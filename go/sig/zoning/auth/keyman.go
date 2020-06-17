@@ -65,15 +65,6 @@ func (km *KeyMan) UpdateMS(masterSecret []byte) {
 	km.ms = masterSecret
 }
 
-// GetL0Key atomically gets the Level-0 key
-func (km *KeyMan) GetL0Key() ([]byte, error) {
-	key, _, err := km.getL0Key()
-	if err != nil {
-		return nil, err
-	}
-	return key, nil
-}
-
 func (km *KeyMan) getL0Key() ([]byte, time.Time, error) {
 	// create new key in case we don't have a key yet or current key has expired
 	if km.l0 == nil || km.l0TTL.Before(time.Now()) {
@@ -109,29 +100,31 @@ func (km *KeyMan) refreshL0() error {
 
 // FetchL1Key fetches the Level-1 key used to send traffic to a remote ZTP.
 // In case the key is not cached or expired it is fetched from remote.
-func (km *KeyMan) FetchL1Key(remote string) ([]byte, error) {
+func (km *KeyMan) FetchL1Key(remote string) ([]byte, bool, error) {
+	var fresh = false
+	var err error
 	if remote == "" {
-		return nil, errors.New("remote cannot be nil")
+		return nil, false, errors.New("remote cannot be nil")
 	}
 	// fetch key in case it is missing or has expired
 	_, t, ok := km.keyCache.GetWithExpiration(remote)
 	if !ok || t.Before(time.Now()) {
-		err := km.fetchL1FromRemote(remote)
+		fresh, err = km.fetchL1FromRemote(remote)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
-	x, _, ok := km.keyCache.GetWithExpiration(remote)
+	x, ok := km.keyCache.Get(remote)
 	if !ok {
-		return nil, errors.New("fetching key failed") // Should never happen, we just fetched it
+		return nil, false, errors.New("fetching key failed") // Should never happen, we just fetched it
 	}
 	l1 := x.([]byte)
 	key := make([]byte, keyLength)
 	copy(key, l1)
-	return key, nil
+	return key, fresh, nil
 }
 
-func (km *KeyMan) fetchL1FromRemote(remote string) error {
+func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
 	//TODO: this lock is bad because it serializes all requests, not just the ones going to the same destination
 	km.reqLock.Lock()
 	defer km.reqLock.Unlock()
@@ -139,33 +132,29 @@ func (km *KeyMan) fetchL1FromRemote(remote string) error {
 	// check if in the meantime another goroutine successfully fetched the key
 	_, t, ok := km.keyCache.GetWithExpiration(remote)
 	if ok && t.After(time.Now()) {
-		return nil
+		return false, nil
 	}
 
 	remoteAddr, err := snet.ParseUDPAddr(remote)
 	remoteAddr.Host.Port = 9090
 	if err != nil {
-		return err
+		return false, err
 	}
 	listen := &net.UDPAddr{IP: km.listenAddr.Host.IP, Port: 0}
 	sess, err := squic.Dial(km.scionNet, listen, remoteAddr, addr.SvcNone, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer sess.Close()
 	stream, err := sess.OpenStreamSync()
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer stream.Close()
 
 	io.WriteString(stream, "get-key")
 	if err != nil {
-		return err
-	}
-
-	if err != nil {
-		return err
+		return false, err
 	}
 
 	// fetch key
@@ -173,11 +162,20 @@ func (km *KeyMan) fetchL1FromRemote(remote string) error {
 	decoder := json.NewDecoder(stream)
 	decoder.Decode(&l1)
 	if err != nil {
-		return err
+		return false, err
 	}
 
+	// check if we indeed got a valid key
+	if len(l1.Key) != keyLength {
+		return false, fmt.Errorf("fetched key has invalid length %d", len(l1.Key))
+	}
+	if l1.TTL.Before(time.Now()) {
+		return false, errors.New("fetched key is expired")
+	}
+
+	// set key with TTL
 	km.keyCache.Set(remote, l1.Key, l1.TTL.Sub(time.Now()))
-	return nil
+	return true, nil
 }
 
 // DeriveL1Key derives the Level-1 key used to verify incoming traffic
