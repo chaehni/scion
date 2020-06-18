@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/snet"
@@ -23,6 +24,12 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
+// Init initializes the auth package
+func Init() {
+	fatal.Check()
+}
+
+// todo make these values customizable by passing them as input to keymanager
 var keyLength = 16
 var keyTTL = 24 * time.Hour
 var keyPurgeInterval = 24 * time.Hour
@@ -103,21 +110,22 @@ func (km *KeyMan) refreshL0() error {
 
 // FetchL1Key fetches the Level-1 key used to send traffic to a remote ZTP.
 // In case the key is not cached or expired it is fetched from remote.
-func (km *KeyMan) FetchL1Key(remote string) ([]byte, bool, error) {
+func (km *KeyMan) FetchL1Key(remote *snet.UDPAddr) ([]byte, bool, error) {
 	var fresh = false
 	var err error
-	if remote == "" {
+	if remote == nil {
 		return nil, false, errors.New("remote cannot be nil")
 	}
+	remoteStr := udpAddrToString(remote)
 	// fetch key in case it is missing or has expired
-	_, t, ok := km.keyCache.GetWithExpiration(remote)
+	_, t, ok := km.keyCache.GetWithExpiration(remoteStr)
 	if !ok || t.Before(time.Now()) {
 		fresh, err = km.fetchL1FromRemote(remote)
 		if err != nil {
 			return nil, false, err
 		}
 	}
-	x, ok := km.keyCache.Get(remote)
+	x, ok := km.keyCache.Get(remoteStr)
 	if !ok {
 		return nil, false, errors.New("fetching key failed") // Should never happen, we just fetched it
 	}
@@ -127,34 +135,32 @@ func (km *KeyMan) FetchL1Key(remote string) ([]byte, bool, error) {
 	return key, fresh, nil
 }
 
-func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
+func (km *KeyMan) fetchL1FromRemote(remote *snet.UDPAddr) (bool, error) {
 	//TODO: this lock is bad because it serializes all requests, not just the ones going to the same destination
 	km.reqLock.Lock()
 	defer km.reqLock.Unlock()
 
 	// check if in the meantime another goroutine successfully fetched the key
-	_, t, ok := km.keyCache.GetWithExpiration(remote)
+	remoteStr := udpAddrToString(remote)
+	_, t, ok := km.keyCache.GetWithExpiration(remoteStr)
 	if ok && t.After(time.Now()) {
 		return false, nil
 	}
 
-	remoteAddr, err := snet.ParseUDPAddr(remote)
-	if err != nil {
-		return false, err
-	}
-	remoteAddr.Host.Port = serverPort
-	paths, err := km.querier.Query(context.Background(), remoteAddr.IA)
+	remoteCpy := remote.Copy()
+	remoteCpy.Host.Port = serverPort
+	paths, err := km.querier.Query(context.Background(), remoteCpy.IA)
 	if err != nil {
 		return false, err
 	}
 	if len(paths) == 0 {
-		return false, fmt.Errorf("no paths found for remote %v", remoteAddr)
+		return false, fmt.Errorf("no paths found for remote %v", remoteStr)
 	}
-	remoteAddr.Path = paths[0].Path()
-	remoteAddr.NextHop = paths[0].OverlayNextHop()
+	remoteCpy.Path = paths[0].Path()
+	remoteCpy.NextHop = paths[0].OverlayNextHop()
 
 	listen := &net.UDPAddr{IP: km.listenIP, Port: 0}
-	sess, err := squic.Dial(km.scionNet, listen, remoteAddr, addr.SvcNone, nil)
+	sess, err := squic.Dial(km.scionNet, listen, remoteCpy, addr.SvcNone, nil)
 	if err != nil {
 		return false, err
 	}
@@ -185,15 +191,15 @@ func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
 	if l1.TTL.Before(time.Now()) {
 		return false, errors.New("fetched key is expired")
 	}
-	log.Debug("[AuthModule Fetcher] successfully fetched L1 key from", "remote", remoteAddr)
+	log.Debug("[AuthModule Fetcher] successfully fetched L1 key from", "remote", remoteStr)
 
 	// set key with TTL
-	km.keyCache.Set(remote, l1.Key, l1.TTL.Sub(time.Now()))
+	km.keyCache.Set(remoteStr, l1.Key, l1.TTL.Sub(time.Now()))
 	return true, nil
 }
 
 // DeriveL1Key derives the Level-1 key used to verify incoming traffic
-func (km *KeyMan) DeriveL1Key(remote string) ([]byte, error) {
+func (km *KeyMan) DeriveL1Key(remote *snet.UDPAddr) ([]byte, error) {
 	k, _, err := km.deriveL1Key(remote)
 	if err != nil {
 		return nil, err
@@ -201,7 +207,7 @@ func (km *KeyMan) DeriveL1Key(remote string) ([]byte, error) {
 	return k, nil
 }
 
-func (km *KeyMan) deriveL1Key(remote string) ([]byte, time.Time, error) {
+func (km *KeyMan) deriveL1Key(remote *snet.UDPAddr) ([]byte, time.Time, error) {
 	l0, t, err := km.getL0Key()
 	if err != nil {
 		return nil, time.Time{}, err
@@ -210,17 +216,15 @@ func (km *KeyMan) deriveL1Key(remote string) ([]byte, time.Time, error) {
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	io.WriteString(mac, remote)
+	io.WriteString(mac, udpAddrToString(remote))
 	return mac.Sum(nil), t, nil
 }
 
 // ServeL1 starts a server handling incoming Level-1 key requests
-func (km *KeyMan) ServeL1(ch chan error) {
+func (km *KeyMan) ServeL1() {
 	go func() {
 		err := km.serveL1()
-		// TODO: use scion fatal?
-		//fatal.Fatal(err)
-		ch <- err
+		fatal.Fatal(err)
 	}()
 }
 
@@ -252,7 +256,7 @@ func (km *KeyMan) serveL1() error {
 			log.Debug("[AuthModule Listener] L1 key request from", "remote", remoteAddr)
 
 			// derive L1 key
-			k, t, err := km.deriveL1Key(fmt.Sprintf("%s,%s", remoteAddr.IA, remoteAddr.Host.IP))
+			k, t, err := km.deriveL1Key(remoteAddr)
 			if err != nil {
 				log.Warn("[AuthModule] failed to derive L1 key", "err", err)
 				return
@@ -278,4 +282,8 @@ func (km *KeyMan) serveL1() error {
 			ioutil.ReadAll(stream)
 		}(sess)
 	}
+}
+
+func udpAddrToString(addr *snet.UDPAddr) string {
+	return fmt.Sprintf("%s,%s", addr.IA, addr.Host.IP)
 }

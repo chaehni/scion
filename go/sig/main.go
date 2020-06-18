@@ -130,7 +130,7 @@ func realMain() int {
 	if err != nil {
 		fmt.Println(err)
 	}
-	pathQuerier := sciond.Querier{Connector: sciondConn, IA: localIA}
+	pathQuerier := &sciond.Querier{Connector: sciondConn, IA: localIA}
 	network := snet.NewNetworkWithPR(localIA, ds, pathQuerier, sciond.RevHandler{Connector: sciondConn})
 	if err != nil {
 		fmt.Println(err)
@@ -140,11 +140,12 @@ func realMain() int {
 		panic(err)
 	}
 
-	local, err := snet.ParseUDPAddr("17-ffaa:1:89,127.0.0.1:9090")
+	local, err := snet.ParseUDPAddr("17-ffaa:1:89,172.16.0.11:9090")
 	if err != nil {
 		panic(err)
 	}
-	keyman := auth.NewKeyMan([]byte("KEY"), network, local)
+	keyman := auth.NewKeyMan([]byte("KEY"), network, pathQuerier, local.Host.IP)
+	keyman.ServeL1()
 
 	ingressAuth := auth.NewModule(keyman, true)
 	egressAuth := auth.NewModule(keyman, false)
@@ -154,6 +155,7 @@ func realMain() int {
 	}
 	egressChain.Register(core, egressLog, tm, egressAuth)
 	ingressChain.Register(ingressAuth, core, tm, ingressLog)
+	auth.Init()
 	/* End of Zoning */
 
 	egress.Init(tunIO, egressChain)
