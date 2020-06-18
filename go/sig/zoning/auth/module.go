@@ -4,20 +4,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/patrickmn/go-cache"
-	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/sig/zoning"
-)
-
-const (
-	ip4Ver    = 0x4
-	ip6Ver    = 0x6
-	ip4SrcOff = 12
-	ip4DstOff = 16
-	ip6DstOff = 24
 )
 
 var version = []byte("1")
@@ -70,7 +60,7 @@ func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
 		copy(ad[1:4], pkt.RawDstZone)
 		binary.LittleEndian.PutUint32(ad[4:], uint32(time.Now().Unix()))
 
-		key, fresh, err := m.km.FetchL1Key(pkt.DstTP.String())
+		key, fresh, err := m.km.FetchL1Key(pkt.DstTP.String()) // make sure pkt.DstTP is set before this module
 		if err != nil {
 			return zoning.NilPacket, fmt.Errorf("[AuthEgress] fetching L1 key failed: %v", err)
 		}
@@ -91,19 +81,6 @@ func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
 			return zoning.NilPacket, fmt.Errorf("[AuthEgress] proof creation failed: %v", err)
 		}
 		return pkt, nil
-	}
-}
-
-func (m *Module) getSrcIP(b common.RawBytes) (net.IP, error) {
-	ver := (b[0] >> 4)
-	switch ver {
-	case ip4Ver:
-		return net.IP(b[ip4SrcOff : ip4SrcOff+net.IPv4len]), nil
-	case ip6Ver:
-		return net.IP(b[ip6DstOff : ip6DstOff+net.IPv6len]), nil
-	default:
-		return nil, common.NewBasicError("Unsupported IP protocol version in egress packet", nil,
-			"type", ver)
 	}
 }
 

@@ -140,7 +140,7 @@ func realMain() int {
 		panic(err)
 	}
 
-	local, _ := snet.ParseUDPAddr("17-ffaa:1:89,127.0.0.1:9090")
+	local, err := snet.ParseUDPAddr("17-ffaa:1:89,127.0.0.1:9090")
 	if err != nil {
 		panic(err)
 	}

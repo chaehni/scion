@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/scionproto/scion/go/lib/log"
+	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/lib/snet/squic"
 
@@ -25,6 +27,7 @@ var keyLength = 16
 var keyTTL = 24 * time.Hour
 var keyPurgeInterval = 24 * time.Hour
 var l0Salt = []byte("L0 Salt value")
+var serverPort = 9090
 
 // KeyPld is the payload sent to other ZTPs carrying the key
 type KeyPld struct {
@@ -36,23 +39,25 @@ var _ = KeyManager(&KeyMan{})
 
 // KeyMan implements KeyManager interface
 type KeyMan struct {
-	ms         []byte
-	l0         []byte
-	l0TTL      time.Time
-	l0Lock     sync.RWMutex
-	keyCache   *cache.Cache
-	scionNet   *snet.SCIONNetwork
-	listenAddr *snet.UDPAddr
-	reqLock    sync.Mutex
+	ms       []byte
+	l0       []byte
+	l0TTL    time.Time
+	l0Lock   sync.RWMutex
+	keyCache *cache.Cache
+	scionNet *snet.SCIONNetwork
+	querier  *sciond.Querier
+	listenIP net.IP
+	reqLock  sync.Mutex
 }
 
 // NewKeyMan creates a new Keyman
-func NewKeyMan(masterSecret []byte, scionNet *snet.SCIONNetwork, listenAddr *snet.UDPAddr) *KeyMan {
+func NewKeyMan(masterSecret []byte, scionNet *snet.SCIONNetwork, querier *sciond.Querier, listenIP net.IP) *KeyMan {
 	return &KeyMan{
-		ms:         masterSecret,
-		keyCache:   cache.New(cache.NoExpiration, keyPurgeInterval),
-		scionNet:   scionNet,
-		listenAddr: listenAddr,
+		ms:       masterSecret,
+		keyCache: cache.New(cache.NoExpiration, keyPurgeInterval),
+		scionNet: scionNet,
+		querier:  querier,
+		listenIP: listenIP,
 	}
 }
 
@@ -134,11 +139,21 @@ func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
 	}
 
 	remoteAddr, err := snet.ParseUDPAddr(remote)
-	remoteAddr.Host.Port = 9090
 	if err != nil {
 		return false, err
 	}
-	listen := &net.UDPAddr{IP: km.listenAddr.Host.IP, Port: 0}
+	remoteAddr.Host.Port = serverPort
+	paths, err := km.querier.Query(context.Background(), remoteAddr.IA)
+	if err != nil {
+		return false, err
+	}
+	if len(paths) == 0 {
+		return false, fmt.Errorf("no paths found for remote %v", remoteAddr)
+	}
+	remoteAddr.Path = paths[0].Path()
+	remoteAddr.NextHop = paths[0].OverlayNextHop()
+
+	listen := &net.UDPAddr{IP: km.listenIP, Port: 0}
 	sess, err := squic.Dial(km.scionNet, listen, remoteAddr, addr.SvcNone, nil)
 	if err != nil {
 		return false, err
@@ -200,8 +215,17 @@ func (km *KeyMan) deriveL1Key(remote string) ([]byte, time.Time, error) {
 }
 
 // ServeL1 starts a server handling incoming Level-1 key requests
-func (km *KeyMan) ServeL1() error {
-	l, err := squic.Listen(km.scionNet, km.listenAddr.Host, addr.SvcNone, nil)
+func (km *KeyMan) ServeL1(ch chan error) {
+	go func() {
+		err := km.serveL1()
+		// TODO: use scion fatal?
+		//fatal.Fatal(err)
+		ch <- err
+	}()
+}
+
+func (km *KeyMan) serveL1() error {
+	l, err := squic.Listen(km.scionNet, &net.UDPAddr{IP: km.listenIP, Port: serverPort}, addr.SvcNone, nil)
 	if err != nil {
 		return err
 	}

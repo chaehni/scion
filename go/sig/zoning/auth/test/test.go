@@ -64,12 +64,12 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	localIA, err := sciondConn.LocalIA(context.Background())
+	listenAddr, err := snet.ParseUDPAddr("17-ffaa:1:89,127.0.0.1")
 	if err != nil {
 		fmt.Println(err)
 	}
-	pathQuerier := sciond.Querier{Connector: sciondConn, IA: localIA}
-	network := snet.NewNetworkWithPR(localIA, ds, pathQuerier, sciond.RevHandler{Connector: sciondConn})
+	pathQuerier := &sciond.Querier{Connector: sciondConn, IA: listenAddr.IA, MaxPaths: 5}
+	network := snet.NewNetworkWithPR(listenAddr.IA, ds, pathQuerier, sciond.RevHandler{Connector: sciondConn})
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -78,19 +78,13 @@ func main() {
 		panic(err)
 	}
 
-	local, _ := snet.ParseUDPAddr("17-ffaa:1:89,127.0.0.1:9090")
-	if err != nil {
-		panic(err)
-	}
-	keyman := auth.NewKeyMan([]byte("KEY"), network, local)
-	//remote, err := snet.ParseUDPAddr("17-ffaa:1:89,127.0.0.1:9090")
+	keyman := auth.NewKeyMan([]byte("KEY"), network, pathQuerier, listenAddr.Host.IP)
 	if err != nil {
 		panic(err)
 	}
 
-	go func() {
-		keyman.ServeL1()
-	}()
+	ch := make(chan error)
+	keyman.ServeL1(ch)
 
 	wg := sync.WaitGroup{}
 
@@ -99,7 +93,7 @@ func main() {
 		go func() {
 			wg.Add(1)
 			for i := 0; i < 1000; i++ {
-				_, err := keyman.FetchL1Key("17-ffaa:1:89,127.0.0.1")
+				_, _, err := keyman.FetchL1Key("17-ffaa:1:89,127.0.0.1")
 				if err != nil {
 					panic(err)
 				}
