@@ -39,6 +39,7 @@ type TR struct {
 	aead        cipher.AEAD
 	nonceCtr    uint64
 	maxNonceCtr uint64
+	nonceRnd    []byte
 	mutex       sync.Mutex
 }
 
@@ -50,17 +51,25 @@ func NewTR(key []byte) (*TR, error) {
 	}
 
 	var maxCtr uint64
+	var rndSize int
 	if aead.NonceSize() >= 8 {
 		maxCtr = math.MaxUint64
+		rndSize = aead.NonceSize() - 8
 	} else {
 		maxCtr = uint64(1<<(aead.NonceSize()*8) - 1)
+		rndSize = 0
 	}
 
-	return &TR{
+	tr := &TR{
 		aead:        aead,
 		nonceCtr:    0,
 		maxNonceCtr: maxCtr,
-	}, nil
+	}
+	tr.nonceRnd = make([]byte, rndSize)
+	if _, err := io.ReadFull(rand.Reader, tr.nonceRnd); err != nil {
+		return nil, err
+	}
+	return tr, nil
 }
 
 // Overhead is the number of additional bytes added to the original IP
@@ -121,18 +130,9 @@ func (t *TR) nextNonce(buf []byte) error {
 		if atomic.CompareAndSwapUint64(&t.nonceCtr, old, new) {
 			bs := make([]byte, 8)
 			binary.LittleEndian.PutUint64(bs, new)
-			n := copy(buf, bs[:min(8, t.aead.NonceSize())])
-			if _, err := io.ReadFull(rand.Reader, buf[n:]); err != nil {
-				return err
-			}
+			n := copy(buf, bs)
+			copy(buf[n:], t.nonceRnd)
 			return nil
 		}
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
