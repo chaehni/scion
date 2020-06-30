@@ -36,5 +36,5 @@ func main() {
 	/*** API used by admin frontend ***/
 	//TODO: iplement frontend
 
-	log.Fatal(shttp.ListenAndServe("17-ffaa:1:89,127.0.0.1:8080", nil))
+	log.Fatal(shttp.ListenAndServe(":8080", nil))
 }

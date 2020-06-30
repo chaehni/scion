@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,17 +24,19 @@ type Module struct {
 	subnets        types.Subnets
 	transfers      types.Transfers
 	client         *http.Client
+	localAddr      string
 	controllerAddr string
 	lock           sync.RWMutex
 }
 
 // New creates a new Transfer Module
-func New(controllerAddr, cert, key string) (*Module, error) {
+func New(localAddr, controllerAddr, cert, key string) (*Module, error) {
 
 	mod := &Module{
 		client: &http.Client{
 			Transport: shttp.NewRoundTripper(&tls.Config{InsecureSkipVerify: true}, nil),
 		},
+		localAddr:      localAddr,
 		controllerAddr: controllerAddr,
 	}
 
@@ -98,7 +101,7 @@ func (m *Module) fetchInfo() error {
 	defer m.lock.Unlock()
 
 	// TODO: make an API package and read routes from there
-	resp, err := m.client.Get(fmt.Sprintf("https://%s/api/get-subnets", m.controllerAddr))
+	resp, err := m.client.Post(fmt.Sprintf("https://%s/api/get-subnets", m.controllerAddr), "text/plain", strings.NewReader(m.localAddr))
 	if err != nil {
 		return err
 	}
@@ -109,7 +112,7 @@ func (m *Module) fetchInfo() error {
 		return err
 	}
 
-	resp, err = m.client.Get(fmt.Sprintf("https://%s/api/get-transfers", m.controllerAddr))
+	resp, err = m.client.Post(fmt.Sprintf("https://%s/api/get-transfers", m.controllerAddr), "text/plain", strings.NewReader(m.localAddr))
 	if err != nil {
 		return err
 	}

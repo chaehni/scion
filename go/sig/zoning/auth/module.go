@@ -74,7 +74,7 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	}
 	key, fresh, err := m.km.FetchL1Key(pkt.DstTP)
 	if err != nil {
-		return zoning.NilPacket, fmt.Errorf("[AuthEgress] fetching L1 key failed: %v", err)
+		return zoning.NilPacket, fmt.Errorf("[AuthEgress] fetching L1 key for %v failed: %v", pkt.DstTP, err)
 	}
 	if fresh {
 		tr, err := NewTR(key)

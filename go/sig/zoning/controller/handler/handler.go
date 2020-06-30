@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -21,7 +22,16 @@ func init() {
 
 // GetSubnetsHandler returns all subnet information to the client
 func GetSubnetsHandler(w http.ResponseWriter, r *http.Request) {
-	nets, err := db.GetSubnets(r.RemoteAddr)
+	// TODO: the shttp package is very basic and does not allow to set the local address
+	// therefore the handler sees the default ISD-AS,127.0.0.1 address as remote. The public IP of the TP is therfore sent
+	// in the body. This should be checked to match the certificate
+	defer r.Body.Close()
+	buf, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	nets, err := db.GetSubnets(string(buf))
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, err.Error())
@@ -34,7 +44,16 @@ func GetSubnetsHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetTransfersHandler returns all transfer information to the client
 func GetTransfersHandler(w http.ResponseWriter, r *http.Request) {
-	transfers, err := db.GetTransfers(r.RemoteAddr)
+	// TODO: the shttp package is very basic and does not allow to set the local address
+	// therefore the handler sees the default ISD-AS,127.0.0.1 address as remote. The public IP of the TP is therfore sent
+	// in the body. This should be checked to match the certificate
+	defer r.Body.Close()
+	buf, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	transfers, err := db.GetTransfers(string(buf))
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, err.Error())

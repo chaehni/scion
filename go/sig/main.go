@@ -135,7 +135,7 @@ func realMain() int {
 	if err != nil {
 		fmt.Println(err)
 	}
-	err = squic.Init("", "")
+	err = squic.Init("key.pem", "cert.pem")
 	if err != nil {
 		panic(err)
 	}
@@ -149,7 +149,7 @@ func realMain() int {
 
 	ingressAuth := auth.NewModule(keyman, true)
 	egressAuth := auth.NewModule(keyman, false)
-	tm, err := transfer.New(":8080", "zoning/controller/certs/client_cert.pem", "zoning/controller/certs/client_key.pem")
+	tm, err := transfer.New("17-ffaa:1:89,172.16.0.11", "17-ffaa:1:89,172.16.0.11:8080", "zoning/controller/certs/client_cert.pem", "zoning/controller/certs/client_key.pem")
 	if err != nil {
 		panic(err)
 	}
