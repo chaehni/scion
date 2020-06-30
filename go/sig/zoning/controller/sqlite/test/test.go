@@ -26,16 +26,16 @@ func main() {
 		panic(err)
 	}
 
-	err = db.InsertSite(net.ParseIP("8.8.9.8"), "Main DC")
+	err = db.InsertSite("17-ffaa:0:87,8.8.9.8", "Main DC")
 	if err != nil {
 		panic(err)
 	}
 
-	err = db.InsertSubnet(1, net.IPNet{IP: net.ParseIP("1.1.1.1"), Mask: net.IPv4Mask(255, 255, 255, 0)}, net.ParseIP("8.8.9.8"))
+	err = db.InsertSubnet(1, net.IPNet{IP: net.ParseIP("1.1.1.1"), Mask: net.IPv4Mask(255, 255, 255, 0)}, "17-ffaa:0:87,8.8.9.8")
 	if err != nil {
 		panic(err)
 	}
-	err = db.InsertSubnet(345, net.IPNet{IP: net.ParseIP("1.2.3.4"), Mask: net.IPv4Mask(255, 0, 255, 0)}, net.ParseIP("8.8.9.8"))
+	err = db.InsertSubnet(345, net.IPNet{IP: net.ParseIP("1.2.3.4"), Mask: net.IPv4Mask(255, 0, 255, 0)}, "17-ffaa:0:87,8.8.9.8")
 	if err != nil {
 		panic(err)
 	}
@@ -63,7 +63,7 @@ func main() {
 		panic(err)
 	}
 
-	nets, err := db.GetAllSubnets()
+	nets, err := db.GetSubnets("17-ffaa:0:87,8.8.9.8")
 	if err != nil {
 		panic(err)
 	}

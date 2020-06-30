@@ -125,7 +125,8 @@ func (b *Backend) InsertZone(zoneID int, name string) error {
 }
 
 // InsertSite inserts a branch site into the Backend
-func (b *Backend) InsertSite(tpAddr net.IP, name string) error {
+func (b *Backend) InsertSite(tpAddr string, name string) error {
+	// TODO: check if tpAddr is a valid address (parse udpaddr)
 	stmt := `INSERT INTO Sites (tp_address, name) VALUES (?, ?)`
 	_, err := b.db.Exec(stmt, tpAddr, name)
 	if err != nil {
@@ -135,7 +136,8 @@ func (b *Backend) InsertSite(tpAddr net.IP, name string) error {
 }
 
 // InsertSubnet inserts a Subnet into the Backend
-func (b *Backend) InsertSubnet(zoneID int, net net.IPNet, tpAddr net.IP) error {
+func (b *Backend) InsertSubnet(zoneID int, net net.IPNet, tpAddr string) error {
+	// TODO: check if tpAddr is a valid address (parse udpaddr)
 	stmt := `INSERT INTO Subnets (zone, net_ip, net_mask, tp_address) VALUES (?, ?, ?, ?)`
 	_, err := b.db.Exec(stmt, zoneID, net.IP, net.Mask, tpAddr)
 	if err != nil {
@@ -180,7 +182,7 @@ func (b *Backend) DeleteZone(zoneID int) error {
 }
 
 // DeleteSite inserts a branch site into the Backend
-func (b *Backend) DeleteSite(tpAddr net.IP) error {
+func (b *Backend) DeleteSite(tpAddr string) error {
 	stmt := `DELETE FROM Sites WHERE tp_address = ?`
 	_, err := b.db.Exec(stmt, tpAddr)
 	if err != nil {
@@ -225,7 +227,7 @@ func (b *Backend) DeleteTransfers(transfers map[int][]int) error {
 /* Getters */
 
 // GetSubnets returns all subnets stored in the backend relevant for ZTP with address tpAddr
-func (b *Backend) GetSubnets(tpAddr net.IP) ([]*types.Subnet, error) {
+func (b *Backend) GetSubnets(tpAddr string) ([]*types.Subnet, error) {
 	stmt := `WITH tp_zones
 	AS (SELECT DISTINCT zone 
 		FROM   subnets 
@@ -252,7 +254,7 @@ func (b *Backend) GetSubnets(tpAddr net.IP) ([]*types.Subnet, error) {
 	var ip []byte
 	var mask []byte
 	var zone types.ZoneID
-	var tp []byte
+	var tp string
 	for rows.Next() {
 		err = rows.Scan(&ip, &mask, &zone, &tp)
 		if err != nil {
@@ -264,7 +266,7 @@ func (b *Backend) GetSubnets(tpAddr net.IP) ([]*types.Subnet, error) {
 }
 
 // GetTransfers returns all allowed transfers stored in the backend
-func (b *Backend) GetTransfers(tpAddr net.IP) (map[int][]int, error) {
+func (b *Backend) GetTransfers(tpAddr string) (map[int][]int, error) {
 	stmt := `WITH relevant_zones 
 	AS (SELECT DISTINCT zone 
 		FROM   subnets 

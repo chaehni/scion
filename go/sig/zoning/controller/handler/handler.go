@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,51 +8,20 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"sync"
-	"time"
 
 	"github.com/scionproto/scion/go/sig/zoning/controller/sqlite"
 )
 
 var db *sqlite.Backend
 
-var zeroKey []byte
-var keySize = 128
-var keyLock sync.RWMutex
-var keyRefreshInterval = 5 * time.Second
-
 func init() {
 	// get a database handle
 	db = setupDB()
-
-	// start periodic key refresh task
-	zeroKey = make([]byte, keySize)
-	err := generateFreshKey()
-	if err != nil {
-		log.Fatal(err)
-	}
-	ticker := time.NewTicker(keyRefreshInterval)
-	go func() {
-		for range ticker.C {
-			err := generateFreshKey()
-			if err != nil {
-				log.Fatal("key generation failed: " + err.Error())
-			}
-		}
-	}()
-}
-
-// GetKeyHandler returns the latest 0-level key to the client
-func GetKeyHandler(w http.ResponseWriter, r *http.Request) {
-	keyLock.RLock()
-	defer keyLock.RUnlock()
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Write(zeroKey)
 }
 
 // GetSubnetsHandler returns all subnet information to the client
 func GetSubnetsHandler(w http.ResponseWriter, r *http.Request) {
-	nets, err := db.GetAllSubnets()
+	nets, err := db.GetSubnets(r.RemoteAddr)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, err.Error())
@@ -66,7 +34,7 @@ func GetSubnetsHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetTransfersHandler returns all transfer information to the client
 func GetTransfersHandler(w http.ResponseWriter, r *http.Request) {
-	transfers, err := db.GetAllTransfers()
+	transfers, err := db.GetTransfers(r.RemoteAddr)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, err.Error())
@@ -128,19 +96,19 @@ func setupDB() *sqlite.Backend {
 		panic(err)
 	}
 
-	err = db.InsertSite(net.ParseIP("172.16.0.11"), "Site A")
+	err = db.InsertSite("17-ffaa:1:89,172.16.0.11", "Site A")
 	if err != nil {
 		panic(err)
 	}
-	err = db.InsertSite(net.ParseIP("172.16.0.12"), "Site B")
+	err = db.InsertSite("17-ffaa:1:c6,172.16.0.12", "Site B")
 	if err != nil {
 		panic(err)
 	}
-	err = db.InsertSubnet(1, net.IPNet{IP: net.ParseIP("172.16.11.0"), Mask: net.IPv4Mask(255, 255, 255, 0)}, net.ParseIP("172.16.0.11"))
+	err = db.InsertSubnet(1, net.IPNet{IP: net.ParseIP("172.16.11.0"), Mask: net.IPv4Mask(255, 255, 255, 0)}, "17-ffaa:1:89,172.16.0.11")
 	if err != nil {
 		panic(err)
 	}
-	err = db.InsertSubnet(1, net.IPNet{IP: net.ParseIP("172.16.12.0"), Mask: net.IPv4Mask(255, 255, 255, 0)}, net.ParseIP("172.16.0.12"))
+	err = db.InsertSubnet(1, net.IPNet{IP: net.ParseIP("172.16.12.0"), Mask: net.IPv4Mask(255, 255, 255, 0)}, "17-ffaa:1:c6,172.16.0.12")
 	if err != nil {
 		panic(err)
 	}
@@ -156,14 +124,4 @@ func setupDB() *sqlite.Backend {
 		panic(err)
 	}
 	return db
-}
-
-func generateFreshKey() error {
-	keyLock.Lock()
-	defer keyLock.Unlock()
-	_, err := rand.Read(zeroKey)
-	if err != nil {
-		return err
-	}
-	return nil
 }

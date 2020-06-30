@@ -1,6 +1,8 @@
 package types
 
-import "net"
+import (
+	"net"
+)
 
 // ZoneID represents 24bit zone identifiers
 // TODO: possible check to make sure IDs are always in the range [0, 1<<24-1]
@@ -18,14 +20,14 @@ type Zone struct {
 
 // Site denotes a branch site of the network
 type Site struct {
-	TPAddr net.IP
+	TPAddr string
 }
 
 // Subnet is an IP subnet that is located behind a TP
 type Subnet struct {
 	IPNet  net.IPNet
 	ZoneID ZoneID
-	TPAddr net.IP
+	TPAddr string
 }
 
 // Subnets is a list of IP subnets

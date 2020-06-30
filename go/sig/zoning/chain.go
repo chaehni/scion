@@ -4,7 +4,6 @@ import (
 	"net"
 
 	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/sig/zoning/types"
 )
 
@@ -38,8 +37,8 @@ func (c *Chain) Handle(pkt Packet) (Packet, error) {
 type Packet struct {
 	SrcHost    net.IP
 	DstHost    net.IP
-	SrcTP      *snet.UDPAddr
-	DstTP      *snet.UDPAddr
+	SrcTP      string
+	DstTP      string
 	DstZone    types.ZoneID
 	RawDstZone common.RawBytes
 	RawPacket  common.RawBytes

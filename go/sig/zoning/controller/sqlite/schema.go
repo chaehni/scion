@@ -14,7 +14,7 @@ const (
 	  );
 
 	  CREATE TABLE Sites(
-		tp_address BLOB NOT NULL,
+		tp_address TEXT NOT NULL,
 		name TEXT,
 		PRIMARY KEY(tp_address)
 	  );
@@ -23,7 +23,7 @@ const (
 		net_ip BLOB NOT NULL,
 		net_mask BLOB NOT NULL,
 		zone INTEGER NOT NULL,
-		tp_address BLOB NOT NULL,
+		tp_address TEXT NOT NULL,
 		PRIMARY KEY (net_ip, net_mask),
 		FOREIGN KEY (zone) REFERENCES Zones(id) ON DELETE CASCADE,
 		FOREIGN KEY (tp_address) REFERENCES Sites(tp_address) ON DELETE CASCADE
