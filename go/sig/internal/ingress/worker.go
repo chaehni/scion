@@ -158,7 +158,7 @@ func (w *Worker) cleanup() {
 
 func (w *Worker) send(packet common.RawBytes) error {
 
-	pkt, err := w.chain.Handle(zoning.Packet{RawPacket: packet, SrcTP: fmt.Sprintf("%s,%s", w.Remote.IA, w.Remote.Host.IP)})
+	pkt, err := w.chain.Handle(zoning.Packet{SrcTP: fmt.Sprintf("%s,%s", w.Remote.IA, w.Remote.Host.IP), RawPacket: packet})
 	if err != nil {
 		return err
 	}

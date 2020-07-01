@@ -149,7 +149,9 @@ func realMain() int {
 
 	ingressAuth := auth.NewModule(keyman, true)
 	egressAuth := auth.NewModule(keyman, false)
-	tm, err := transfer.New("17-ffaa:1:89,172.16.0.11", "17-ffaa:1:89,172.16.0.11:8080", "zoning/controller/certs/client_cert.pem", "zoning/controller/certs/client_key.pem")
+
+	localIAHost := "17-ffaa:1:89,172.16.0.11"
+	tm, err := transfer.New(localIAHost, "17-ffaa:1:89,127.0.0.1:8080", "zoning/controller/certs/client_cert.pem", "zoning/controller/certs/client_key.pem")
 	if err != nil {
 		panic(err)
 	}
@@ -158,7 +160,7 @@ func realMain() int {
 	auth.Init()
 	/* End of Zoning */
 
-	egress.Init(tunIO, egressChain)
+	egress.Init(tunIO, egressChain, localIAHost)
 	ingress.Init(tunIO, ingressChain)
 	http.HandleFunc("/config", configHandler)
 	http.HandleFunc("/info", env.InfoHandler)
