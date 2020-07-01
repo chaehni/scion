@@ -37,9 +37,31 @@ var l0Salt = []byte("L0 Salt value")
 var serverPort = 9090
 
 // KeyPld is the payload sent to other ZTPs carrying the key
-type KeyPld struct {
-	Key []byte
-	TTL time.Time
+type keyPld struct {
+	key []byte
+	ttl time.Time
+}
+
+func (k *keyPld) MarshalJSON() ([]byte, error) {
+	dummy := struct {
+		Key []byte
+		TTL time.Time
+	}{
+		k.key,
+		k.ttl,
+	}
+	return json.Marshal(dummy)
+}
+
+func (k *keyPld) UnmarshalJSON(b []byte) error {
+	var dummy struct {
+		Key []byte
+		TTL time.Time
+	}
+	err := json.Unmarshal(b, dummy)
+	k.key = dummy.Key
+	k.ttl = dummy.TTL
+	return err
 }
 
 var _ = KeyManager(&KeyMan{})
@@ -178,7 +200,7 @@ func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
 	}
 
 	// fetch key
-	var l1 KeyPld
+	var l1 keyPld
 	decoder := json.NewDecoder(stream)
 	decoder.Decode(&l1)
 	if err != nil {
@@ -186,16 +208,16 @@ func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
 	}
 
 	// check if we indeed got a valid key
-	if len(l1.Key) != keyLength {
-		return false, fmt.Errorf("fetched key has invalid length %d", len(l1.Key))
+	if len(l1.key) != keyLength {
+		return false, fmt.Errorf("fetched key has invalid length %d", len(l1.key))
 	}
-	if l1.TTL.Before(time.Now()) {
+	if l1.ttl.Before(time.Now()) {
 		return false, errors.New("fetched key is expired")
 	}
 	log.Debug("[AuthModule Fetcher] successfully fetched L1 key from", "remote", remote)
 
 	// set key with TTL
-	km.keyCache.Set(remote, l1.Key, l1.TTL.Sub(time.Now()))
+	km.keyCache.Set(remote, l1.key, l1.ttl.Sub(time.Now()))
 	return true, nil
 }
 
@@ -263,9 +285,9 @@ func (km *KeyMan) serveL1() error {
 				return
 			}
 
-			pld := KeyPld{
-				Key: k,
-				TTL: t,
+			pld := keyPld{
+				key: k,
+				ttl: t,
 			}
 
 			// write key with timestamp to conn

@@ -65,13 +65,19 @@ func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	// get zones for src/dest
-	srcZone, _, err := m.findZone(pkt.SrcHost)
+	srcZone, srcTP, err := m.findZone(pkt.SrcHost)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("%v find source zone: %v", errorPrefix, err)
 	}
 	pkt.DstZone, pkt.DstTP, err = m.findZone(pkt.DstHost)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("%v find destination zone: %v", errorPrefix, err)
+	}
+
+	// check if claimed src IP is located behind the actual srcTP (as read from SCION header)
+	// (if srcTP was spoofed too, we wouldn't even get this far since the MAC verification would have failed in the auth module)
+	if srcTP != pkt.SrcTP {
+		return zoning.NilPacket, fmt.Errorf("%v source TP %v is not responsible for claimed source %v", errorPrefix, pkt.SrcTP, srcTP)
 	}
 
 	// check if transfer is allowed
