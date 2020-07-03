@@ -84,7 +84,7 @@ BatchLoop:
 			go func() {
 				buf = buf[:length]
 
-				pkt, err := r.chain.Handle(zoning.Packet{RawPacket: buf})
+				pkt, err := r.chain.Handle(zoning.Packet{Ingress: false, RawPacket: buf})
 				if err != nil {
 					// Release buffer back to free buffer pool
 					iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)

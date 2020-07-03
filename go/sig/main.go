@@ -123,8 +123,7 @@ func realMain() int {
 	// auth modules
 	keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf)
 	keyman.ServeL1()
-	ingressAuth := auth.NewModule(keyman, true)
-	egressAuth := auth.NewModule(keyman, false)
+	am := auth.NewModule(keyman)
 
 	// transfer module
 	tm, err := transfer.New(cfg.Sig.IA, cfg.Sig.IP, cfg.TP.TransConf)
@@ -133,8 +132,8 @@ func realMain() int {
 	}
 
 	// register modules
-	egressChain.Register(core, egressLog, tm, egressAuth)
-	ingressChain.Register(ingressAuth, core, tm, ingressLog)
+	egressChain.Register(core, egressLog, tm, am)
+	ingressChain.Register(am, core, tm, ingressLog)
 	auth.Init()
 	/* End of Zoning */
 

@@ -38,7 +38,7 @@ func (cm *CoreModule) Handle(pkt Packet) (Packet, error) {
 	}
 	pkt.DstHost = dst
 	pkt.SrcHost = src
-	pkt.SrcTP = cm.local
+
 	return pkt, nil
 }
 

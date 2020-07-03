@@ -66,6 +66,13 @@ func New(ia addr.IA, ip net.IP, cfg tpconfig.TransConf) (*Module, error) {
 
 // Handle checks packets for valid zone transfers
 func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
+	if pkt.Ingress {
+		return m.handleIngress(pkt)
+	}
+	return m.handleEgress(pkt)
+}
+
+func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	// get reader lock in case data is currently being refreshed
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -74,15 +81,15 @@ func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("%v find source zone: %v", errorPrefix, err)
 	}
-	pkt.DstZone, pkt.DstTP, err = m.findZone(pkt.DstHost)
+	destZone, _, err := m.findZone(pkt.DstHost)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("%v find destination zone: %v", errorPrefix, err)
 	}
 
 	// check if claimed src IP is located behind the actual srcTP (as read from SCION header)
 	// (if srcTP was spoofed too, we wouldn't even get this far since the MAC verification would have failed in the auth module)
-	if srcTP != pkt.SrcTP {
-		return zoning.NilPacket, fmt.Errorf("%v source TP %v is not responsible for claimed source %v", errorPrefix, pkt.SrcTP, srcTP)
+	if srcTP != pkt.RemoteTP {
+		return zoning.NilPacket, fmt.Errorf("%v source TP %v is not responsible for claimed source %v", errorPrefix, pkt.RemoteTP, srcTP)
 	}
 
 	// check if transfer is allowed
@@ -91,11 +98,40 @@ func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
 		return zoning.NilPacket, fmt.Errorf("%v no transfer rules found for source zone %v", errorPrefix, srcZone)
 	}
 	for _, dest := range dests {
-		if pkt.DstZone == dest {
+		if destZone == dest {
 			return pkt, nil
 		}
 	}
-	return zoning.NilPacket, fmt.Errorf("%v transfer from zone %v to zone %v not allowed", errorPrefix, srcZone, pkt.DstZone)
+	return zoning.NilPacket, fmt.Errorf("%v transfer from zone %v to zone %v not allowed", errorPrefix, srcZone, destZone)
+}
+
+func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
+	// get reader lock in case data is currently being refreshed
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	// get zones for src/dest
+	srcZone, _, err := m.findZone(pkt.SrcHost)
+	if err != nil {
+		return zoning.NilPacket, fmt.Errorf("%v find source zone: %v", errorPrefix, err)
+	}
+	destZone, dstTP, err := m.findZone(pkt.DstHost)
+	if err != nil {
+		return zoning.NilPacket, fmt.Errorf("%v find destination zone: %v", errorPrefix, err)
+	}
+	pkt.RemoteTP = dstTP
+	pkt.DstZone = destZone
+
+	// check if transfer is allowed
+	dests, ok := m.transfers[srcZone]
+	if !ok {
+		return zoning.NilPacket, fmt.Errorf("%v no transfer rules found for source zone %v", errorPrefix, srcZone)
+	}
+	for _, dest := range dests {
+		if destZone == dest {
+			return pkt, nil
+		}
+	}
+	return zoning.NilPacket, fmt.Errorf("%v transfer from zone %v to zone %v not allowed", errorPrefix, srcZone, destZone)
 }
 
 func (m *Module) findZone(ip net.IP) (types.ZoneID, string, error) {

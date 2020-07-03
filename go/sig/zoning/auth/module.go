@@ -23,27 +23,26 @@ type Module struct {
 }
 
 // NewModule returns a new authentication module
-func NewModule(km KeyManager, ingress bool) *Module {
+func NewModule(km KeyManager) *Module {
 	return &Module{
-		km:      km,
-		ingress: ingress,
-		tmap:    cache.New(cache.NoExpiration, -1),
+		km:   km,
+		tmap: cache.New(cache.NoExpiration, -1),
 	}
 }
 
 // Handle handles individual IP packets, transforming them to/from intermediate representation
 func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
-	if m.ingress {
+	if pkt.Ingress {
 		return m.handleIngress(pkt)
 	}
 	return m.handleEgress(pkt)
 }
 
 func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
-	if pkt.SrcTP == "" {
+	if pkt.RemoteTP == "" {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] source TP address not set in packet")
 	}
-	key, err := m.km.DeriveL1Key(pkt.SrcTP)
+	key, err := m.km.DeriveL1Key(pkt.RemoteTP)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] key derivation failed: %v", err)
 	}
@@ -70,12 +69,12 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	copy(ad[1:4], pkt.RawDstZone)
 	binary.LittleEndian.PutUint32(ad[4:], uint32(time.Now().Unix()))
 
-	if pkt.DstTP == "" {
+	if pkt.RemoteTP == "" {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] destination TP address not set in packet")
 	}
-	key, fresh, err := m.km.FetchL1Key(pkt.DstTP)
+	key, fresh, err := m.km.FetchL1Key(pkt.RemoteTP)
 	if err != nil {
-		return zoning.NilPacket, fmt.Errorf("[AuthEgress] fetching L1 key for %v failed: %v", pkt.DstTP, err)
+		return zoning.NilPacket, fmt.Errorf("[AuthEgress] fetching L1 key for %v failed: %v", pkt.RemoteTP, err)
 	}
 	if fresh {
 		tr, err := NewTR(key)
@@ -87,9 +86,9 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 		// basically the first lookup is just to see if the key is still valid
 		// this is not ideal from computational overhead but it cleanly separates key management from encryption
 		// if the key manager would also provide the TR we would only have one lookup but we don't have clean interfaces anymore
-		m.tmap.Set(pkt.DstTP, tr, -1)
+		m.tmap.Set(pkt.RemoteTP, tr, -1)
 	}
-	tr, ok := m.tmap.Get(pkt.DstTP)
+	tr, ok := m.tmap.Get(pkt.RemoteTP)
 	if !ok {
 		return zoning.NilPacket, fmt.Errorf("[AuthEgress] transformer not found in cache: %v", err)
 	}
