@@ -117,8 +117,7 @@ func realMain() int {
 	core := zoning.NewCoreModule(cfg.Sig.IA, cfg.Sig.IP)
 
 	// log module
-	ingressLog := &zoning.LogModule{Prefix: "ingress"}
-	egressLog := &zoning.LogModule{Prefix: "egress"}
+	lm := &zoning.LogModule{LocalTP: fmt.Sprintf("%v,%v", cfg.Sig.IA, cfg.Sig.IP)}
 
 	// auth modules
 	keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf)
@@ -132,8 +131,8 @@ func realMain() int {
 	}
 
 	// register modules
-	egressChain.Register(core, egressLog, tm, am)
-	ingressChain.Register(am, core, tm, ingressLog)
+	egressChain.Register(core, lm, tm, am)
+	ingressChain.Register(am, core, tm, lm)
 	auth.Init()
 	/* End of Zoning */
 
