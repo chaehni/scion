@@ -12,11 +12,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
+
 	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/lib/snet/squic"
+	"github.com/scionproto/scion/go/lib/sock/reliable"
 
 	"github.com/lucas-clemente/quic-go"
 	"github.com/patrickmn/go-cache"
@@ -29,12 +32,7 @@ func Init() {
 	fatal.Check()
 }
 
-// TODO make these values customizable by passing them as input to keymanager
-var keyLength = 16
-var keyTTL = 24 * time.Hour
-var keyPurgeInterval = 24 * time.Hour
 var l0Salt = []byte("L0 Salt value")
-var serverPort = 9090
 
 // KeyPld is the payload sent to other ZTPs carrying the key
 type keyPld struct {
@@ -42,7 +40,7 @@ type keyPld struct {
 	ttl time.Time
 }
 
-func (k *keyPld) MarshalJSON() ([]byte, error) {
+func (k keyPld) MarshalJSON() ([]byte, error) {
 	dummy := struct {
 		Key []byte
 		TTL time.Time
@@ -58,7 +56,7 @@ func (k *keyPld) UnmarshalJSON(b []byte) error {
 		Key []byte
 		TTL time.Time
 	}
-	err := json.Unmarshal(b, dummy)
+	err := json.Unmarshal(b, &dummy)
 	k.key = dummy.Key
 	k.ttl = dummy.TTL
 	return err
@@ -68,25 +66,55 @@ var _ = KeyManager(&KeyMan{})
 
 // KeyMan implements KeyManager interface
 type KeyMan struct {
-	ms       []byte
-	l0       []byte
-	l0TTL    time.Time
-	l0Lock   sync.RWMutex
-	keyCache *cache.Cache
-	scionNet *snet.SCIONNetwork
-	querier  *sciond.Querier
-	listenIP net.IP
-	reqLock  sync.Mutex
+	keyLength        int
+	keyTTL           time.Duration
+	keyPurgeInterval time.Duration
+
+	ms         []byte
+	l0         []byte
+	l0TTL      time.Time
+	l0Lock     sync.RWMutex
+	keyCache   *cache.Cache
+	scionNet   *snet.SCIONNetwork
+	querier    *sciond.Querier
+	listenIP   net.IP
+	listenPort int
+	reqLock    sync.Mutex
 }
 
 // NewKeyMan creates a new Keyman
-func NewKeyMan(masterSecret []byte, scionNet *snet.SCIONNetwork, querier *sciond.Querier, listenIP net.IP) *KeyMan {
+func NewKeyMan(masterSecret []byte, listenIP net.IP, cfg tpconfig.AuthConf) *KeyMan {
+
+	ds := reliable.NewDispatcher("")
+	sciondConn, err := sciond.NewService(sciond.DefaultSCIONDAddress).Connect(context.Background())
+	if err != nil {
+		fmt.Println(err)
+	}
+	localIA, err := sciondConn.LocalIA(context.Background())
+	if err != nil {
+		fmt.Println(err)
+	}
+	pathQuerier := &sciond.Querier{Connector: sciondConn, IA: localIA}
+	network := snet.NewNetworkWithPR(localIA, ds, pathQuerier, sciond.RevHandler{Connector: sciondConn})
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = squic.Init("key.pem", "cert.pem")
+	if err != nil {
+		panic(err)
+	}
+
 	return &KeyMan{
-		ms:       masterSecret,
-		keyCache: cache.New(cache.NoExpiration, keyPurgeInterval),
-		scionNet: scionNet,
-		querier:  querier,
-		listenIP: listenIP,
+		keyLength:        cfg.KeyLength,
+		keyTTL:           cfg.KeyTTL.Duration,
+		keyPurgeInterval: cfg.KeyPurgeInterval.Duration,
+
+		ms:         masterSecret,
+		keyCache:   cache.New(cache.NoExpiration, cfg.KeyPurgeInterval.Duration),
+		scionNet:   network,
+		querier:    pathQuerier,
+		listenIP:   listenIP,
+		listenPort: cfg.ServerPort,
 	}
 }
 
@@ -108,7 +136,7 @@ func (km *KeyMan) getL0Key() ([]byte, time.Time, error) {
 
 	km.l0Lock.RLock()
 	defer km.l0Lock.RUnlock()
-	k := make([]byte, keyLength)
+	k := make([]byte, km.keyLength)
 	copy(k, km.l0)
 	return k, km.l0TTL, nil
 }
@@ -126,7 +154,7 @@ func (km *KeyMan) refreshL0() error {
 	}
 	key := pbkdf2.Key(km.ms, l0Salt, 1000, 12, sha256.New)
 	km.l0 = key
-	km.l0TTL = time.Now().Add(keyTTL)
+	km.l0TTL = time.Now().Add(km.keyTTL)
 	return nil
 }
 
@@ -151,7 +179,7 @@ func (km *KeyMan) FetchL1Key(remote string) ([]byte, bool, error) {
 		return nil, false, errors.New("fetching key failed") // Should never happen, we just fetched it
 	}
 	l1 := x.([]byte)
-	key := make([]byte, keyLength)
+	key := make([]byte, km.keyLength)
 	copy(key, l1)
 	return key, fresh, nil
 }
@@ -171,7 +199,7 @@ func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	remoteCpy.Host.Port = serverPort
+	remoteCpy.Host.Port = km.listenPort
 	paths, err := km.querier.Query(context.Background(), remoteCpy.IA)
 	if err != nil {
 		return false, err
@@ -208,7 +236,7 @@ func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
 	}
 
 	// check if we indeed got a valid key
-	if len(l1.key) != keyLength {
+	if len(l1.key) != km.keyLength {
 		return false, fmt.Errorf("fetched key has invalid length %d", len(l1.key))
 	}
 	if l1.ttl.Before(time.Now()) {
@@ -252,7 +280,7 @@ func (km *KeyMan) ServeL1() {
 }
 
 func (km *KeyMan) serveL1() error {
-	l, err := squic.Listen(km.scionNet, &net.UDPAddr{IP: km.listenIP, Port: serverPort}, addr.SvcNone, nil)
+	l, err := squic.Listen(km.scionNet, &net.UDPAddr{IP: km.listenIP, Port: km.listenPort}, addr.SvcNone, nil)
 	if err != nil {
 		return err
 	}

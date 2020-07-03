@@ -24,6 +24,7 @@ import (
 	"github.com/scionproto/scion/go/lib/env"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/serrors"
+	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
 )
 
 const (
@@ -39,6 +40,7 @@ type Config struct {
 	Metrics  env.Metrics      `toml:"metrics,omitempty"`
 	Sciond   env.SCIONDClient `toml:"sciond_connection,omitempty"`
 	Sig      SigConf          `toml:"sig,omitempty"`
+	TP       tpconfig.TPConf  `toml:"tp,omitempty"`
 }
 
 func (cfg *Config) InitDefaults() {
@@ -48,6 +50,7 @@ func (cfg *Config) InitDefaults() {
 		&cfg.Metrics,
 		&cfg.Sciond,
 		&cfg.Sig,
+		&cfg.TP,
 	)
 }
 
@@ -68,6 +71,7 @@ func (cfg *Config) Sample(dst io.Writer, path config.Path, _ config.CtxMap) {
 		&cfg.Metrics,
 		&cfg.Sciond,
 		&cfg.Sig,
+		&cfg.TP,
 	)
 }
 

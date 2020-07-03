@@ -17,7 +17,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -35,13 +34,9 @@ import (
 	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/prom"
-	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/serrors"
 	"github.com/scionproto/scion/go/lib/sigdisp"
 	"github.com/scionproto/scion/go/lib/sigjson"
-	"github.com/scionproto/scion/go/lib/snet"
-	"github.com/scionproto/scion/go/lib/snet/squic"
-	"github.com/scionproto/scion/go/lib/sock/reliable"
 	"github.com/scionproto/scion/go/sig/egress"
 	"github.com/scionproto/scion/go/sig/internal/base"
 	"github.com/scionproto/scion/go/sig/internal/ingress"
@@ -117,50 +112,33 @@ func realMain() int {
 	// create chain of modules
 	egressChain := zoning.Chain{}
 	ingressChain := zoning.Chain{}
-	core := &zoning.CoreModule{}
+
+	// core module
+	core := zoning.NewCoreModule(cfg.Sig.IA, cfg.Sig.IP)
+
+	// log module
 	ingressLog := &zoning.LogModule{Prefix: "ingress"}
 	egressLog := &zoning.LogModule{Prefix: "egress"}
 
-	ds := reliable.NewDispatcher("")
-	sciondConn, err := sciond.NewService(sciond.DefaultSCIONDAddress).Connect(context.Background())
-	if err != nil {
-		fmt.Println(err)
-	}
-	localIA, err := sciondConn.LocalIA(context.Background())
-	if err != nil {
-		fmt.Println(err)
-	}
-	pathQuerier := &sciond.Querier{Connector: sciondConn, IA: localIA}
-	network := snet.NewNetworkWithPR(localIA, ds, pathQuerier, sciond.RevHandler{Connector: sciondConn})
-	if err != nil {
-		fmt.Println(err)
-	}
-	err = squic.Init("key.pem", "cert.pem")
-	if err != nil {
-		panic(err)
-	}
-
-	local, err := snet.ParseUDPAddr("17-ffaa:1:89,172.16.0.11:9090")
-	if err != nil {
-		panic(err)
-	}
-	keyman := auth.NewKeyMan([]byte("KEY"), network, pathQuerier, local.Host.IP)
+	// auth modules
+	keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf)
 	keyman.ServeL1()
-
 	ingressAuth := auth.NewModule(keyman, true)
 	egressAuth := auth.NewModule(keyman, false)
 
-	localIAHost := "17-ffaa:1:89,172.16.0.11"
-	tm, err := transfer.New(localIAHost, "17-ffaa:1:89,127.0.0.1:8080", "zoning/controller/certs/client_cert.pem", "zoning/controller/certs/client_key.pem")
+	// transfer module
+	tm, err := transfer.New(cfg.Sig.IA, cfg.Sig.IP, cfg.TP.TransConf)
 	if err != nil {
 		panic(err)
 	}
+
+	// register modules
 	egressChain.Register(core, egressLog, tm, egressAuth)
 	ingressChain.Register(ingressAuth, core, tm, ingressLog)
 	auth.Init()
 	/* End of Zoning */
 
-	egress.Init(tunIO, egressChain, localIAHost)
+	egress.Init(tunIO, egressChain)
 	ingress.Init(tunIO, ingressChain)
 	http.HandleFunc("/config", configHandler)
 	http.HandleFunc("/info", env.InfoHandler)

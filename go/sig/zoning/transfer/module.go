@@ -11,37 +11,42 @@ import (
 	"time"
 
 	"github.com/netsec-ethz/scion-apps/pkg/shttp"
+	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/sig/zoning"
+	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
 	"github.com/scionproto/scion/go/sig/zoning/types"
 )
 
 var errorPrefix = "[TransferModule]"
-var refreshInterval = 5 * time.Minute
 
 // Module implements the transfer module.
 // It checks packets for valid zone transfers.
 type Module struct {
-	subnets        types.Subnets
-	transfers      types.Transfers
-	client         *http.Client
+	subnets   types.Subnets
+	transfers types.Transfers
+	client    *http.Client
+	// TODO: local address is sent to the controller to identify the right TP
+	// This is hack, the controller should read the remote address itself but
+	// the dumbed down shttp package doesn't allow to set the local address on the client side
+	// instead it always uses 127.0.0.1
 	localAddr      string
 	controllerAddr string
 	lock           sync.RWMutex
 }
 
 // New creates a new Transfer Module
-func New(localAddr, controllerAddr, cert, key string) (*Module, error) {
+func New(ia addr.IA, ip net.IP, cfg tpconfig.TransConf) (*Module, error) {
 
 	mod := &Module{
 		client: &http.Client{
 			Transport: shttp.NewRoundTripper(&tls.Config{InsecureSkipVerify: true}, nil),
 		},
-		localAddr:      localAddr,
-		controllerAddr: controllerAddr,
+		localAddr:      fmt.Sprintf("%v,%v", ia, ip),
+		controllerAddr: cfg.ControllerAddr,
 	}
 
 	// start periodic task fetching info from controller
-	ticker := time.NewTicker(refreshInterval)
+	ticker := time.NewTicker(cfg.RefrehInterval.Duration)
 	err := mod.fetchInfo()
 	if err != nil {
 		return nil, fmt.Errorf("%v Failed to fetch initial data from controller: %v", errorPrefix, err)

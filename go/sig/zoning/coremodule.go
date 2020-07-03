@@ -1,8 +1,10 @@
 package zoning
 
 import (
+	"fmt"
 	"net"
 
+	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 )
 
@@ -15,7 +17,14 @@ const (
 )
 
 // CoreModule implements the zoning architecture's core module
-type CoreModule struct{}
+type CoreModule struct {
+	local string
+}
+
+// NewCoreModule returns a new core module
+func NewCoreModule(ia addr.IA, ip net.IP) *CoreModule {
+	return &CoreModule{local: fmt.Sprintf("%v,%v", ia, ip)}
+}
 
 // Handle handles IP packets
 func (cm *CoreModule) Handle(pkt Packet) (Packet, error) {
@@ -29,6 +38,7 @@ func (cm *CoreModule) Handle(pkt Packet) (Packet, error) {
 	}
 	pkt.DstHost = dst
 	pkt.SrcHost = src
+	pkt.SrcTP = cm.local
 	return pkt, nil
 }
 

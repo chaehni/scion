@@ -28,8 +28,6 @@ import (
 	"math"
 	"sync"
 	"sync/atomic"
-
-	"github.com/scionproto/scion/go/lib/log"
 )
 
 var headerLength = 8
@@ -94,9 +92,6 @@ func (t *TR) ToIR(packet, additionalData []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: DEBUG:
-	log.Debug("Printing Nonce", "nonce", nonce)
 
 	copy(dst[nonceSize:nonceSize+headerLength], additionalData)
 	buf := t.aead.Seal(dst[:nonceSize+headerLength], nonce, packet, additionalData)

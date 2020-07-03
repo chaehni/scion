@@ -10,6 +10,7 @@ import (
 	"github.com/scionproto/scion/go/sig/zoning"
 )
 
+// this should be increased when breaking changes are made
 var version = []byte("1")
 var maxTimeDiff = 1 * time.Second
 
