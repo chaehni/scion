@@ -166,7 +166,7 @@ func (w *Worker) send(packet common.RawBytes) error {
 
 	bytesWritten, err := w.tunIO.Write(packet)
 	if err != nil {
-		return common.NewBasicError("Unable to write to internal ingress", err,
+		return common.NewBasicError("Unable to write to ingress", err,
 			"length", len(packet))
 	}
 	w.sentCtrs.Pkts.Inc()

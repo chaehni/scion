@@ -131,7 +131,7 @@ func realMain() int {
 	}
 
 	// register modules
-	egressChain.Register(core, lm, tm, am)
+	egressChain.Register(core, tm, lm, am)
 	ingressChain.Register(am, core, tm, lm)
 	auth.Init()
 	/* End of Zoning */

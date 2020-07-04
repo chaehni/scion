@@ -13,6 +13,7 @@ const (
 	ip6Ver    = 0x6
 	ip4SrcOff = 12
 	ip4DstOff = 16
+	ip6SrcOff = 8
 	ip6DstOff = 24
 )
 
@@ -60,7 +61,7 @@ func (cm *CoreModule) getSrcIP(b common.RawBytes) (net.IP, error) {
 	case ip4Ver:
 		return net.IP(b[ip4SrcOff : ip4SrcOff+net.IPv4len]), nil
 	case ip6Ver:
-		return net.IP(b[ip6DstOff : ip6DstOff+net.IPv6len]), nil
+		return net.IP(b[ip6SrcOff : ip6SrcOff+net.IPv6len]), nil
 	default:
 		return nil, common.NewBasicError("Unsupported IP protocol version in egress packet", nil,
 			"type", ver)
