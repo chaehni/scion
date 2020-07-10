@@ -4,7 +4,6 @@ import (
 	"net"
 
 	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/sig/zoning/types"
 )
 
 // Chain is a pipeline of modules which is traversed by each packet
@@ -39,7 +38,7 @@ type Packet struct {
 	SrcHost    net.IP
 	DstHost    net.IP
 	RemoteTP   string
-	DstZone    types.ZoneID
+	DstZone    uint32
 	RawDstZone common.RawBytes
 	RawPacket  common.RawBytes
 }

@@ -73,7 +73,9 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	ad := make([]byte, 8)
 	copy(ad[:1], version)
-	copy(ad[1:4], pkt.RawDstZone)
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, pkt.DstZone)
+	copy(ad[1:4], buf)
 	binary.LittleEndian.PutUint32(ad[4:], uint32(time.Now().Unix()))
 
 	if pkt.RemoteTP == "" {

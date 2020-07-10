@@ -119,7 +119,7 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 		return zoning.NilPacket, fmt.Errorf("%v find destination zone: %v", errorPrefix, err)
 	}
 	pkt.RemoteTP = dstTP
-	pkt.DstZone = destZone
+	pkt.DstZone = uint32(destZone)
 
 	// check if transfer is allowed
 	dests, ok := m.transfers[srcZone]
