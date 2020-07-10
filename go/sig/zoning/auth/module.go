@@ -8,25 +8,27 @@ import (
 
 	"github.com/patrickmn/go-cache"
 	"github.com/scionproto/scion/go/sig/zoning"
+	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
 )
 
 // this should be increased when breaking changes are made
 var version = []byte("1")
-var maxTimeDiff = 1 * time.Second
 
 // Module implements the authentication module
 // It transforms IP packets to and from intermediate representation
 type Module struct {
-	km      KeyManager
-	tmap    *cache.Cache
-	ingress bool
+	km          KeyManager
+	tmap        *cache.Cache
+	ingress     bool
+	maxTimeDiff time.Duration
 }
 
 // NewModule returns a new authentication module
-func NewModule(km KeyManager) *Module {
+func NewModule(km KeyManager, cfg tpconfig.AuthConf) *Module {
 	return &Module{
-		km:   km,
-		tmap: cache.New(cache.NoExpiration, -1),
+		km:          km,
+		tmap:        cache.New(cache.NoExpiration, -1),
+		maxTimeDiff: cfg.MaxTimeDiff.Duration,
 	}
 }
 
@@ -57,7 +59,7 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	}
 	pkt.RawDstZone = ad[1:4]
 	ts := time.Unix(int64(binary.LittleEndian.Uint32(ad[4:])), 0)
-	err = checkTime(ts)
+	err = m.checkTime(ts)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] verification failed: %v", err)
 	}
@@ -99,9 +101,9 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	return pkt, nil
 }
 
-func checkTime(t time.Time) error {
+func (m *Module) checkTime(t time.Time) error {
 	diff := abs(t.Sub(time.Now().UTC()))
-	if diff > maxTimeDiff {
+	if diff > m.maxTimeDiff {
 		return errors.New("time difference is to big")
 	}
 	return nil

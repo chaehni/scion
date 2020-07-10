@@ -34,7 +34,7 @@ func Init() {
 
 var l0Salt = []byte("L0 Salt value")
 
-// KeyPld is the payload sent to other ZTPs carrying the key
+// KeyPld is the payload sent to other ZTPs carrying the key and the key expiration time
 type keyPld struct {
 	key []byte
 	ttl time.Time
