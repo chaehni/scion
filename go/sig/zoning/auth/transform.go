@@ -29,22 +29,24 @@ import (
 	"sync/atomic"
 )
 
+// version should be increased when breaking changes are made
+var version = []byte{1}
 var headerLength = 8
 var typeOffset = 0
+var typeLength = 1
 var zoneOffset = 1
+var zoneLength = 3
 var timeOffset = 4
+var timeLength = 4
 
 var _ = Transformer(&TR{})
 
 // TR implements the Transformer interface
 type TR struct {
-	//aead cipher.AEAD
-	//nonceSize   int
 	nonceCtr    uint64
 	maxNonceCtr uint64
 	nonceRnd    []byte
-	///mutex       sync.Mutex
-	once sync.Once
+	once        sync.Once
 }
 
 // NewTR creates a new Transformer
@@ -61,7 +63,6 @@ func NewTR() (*TR, error) {
 	}
 
 	tr := &TR{
-		//aead:        aead,
 		nonceCtr:    0,
 		maxNonceCtr: maxCtr,
 	}
@@ -114,12 +115,6 @@ func (t *TR) FromIR(key, message []byte) (additionalData []byte, packet []byte, 
 		return nil, nil, err
 	}
 	return additionalData, plaintext, nil
-}
-
-// TODO: needed?
-// UpdateKey updates the key for the encryption used by Transformer
-func (t *TR) UpdateKey() error {
-	return errors.New("not implemented")
 }
 
 // GetZone extracts the zone infromation from the encrypted packet

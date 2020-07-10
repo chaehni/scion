@@ -11,9 +11,6 @@ import (
 	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
 )
 
-// this should be increased when breaking changes are made
-var version = []byte("1")
-
 // Module implements the authentication module
 // It transforms IP packets to and from intermediate representation
 type Module struct {
@@ -44,10 +41,6 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	if pkt.RemoteTP == "" {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] source TP address not set in packet")
 	}
-	/* key, err := m.km.DeriveL1Key(pkt.RemoteTP)
-	if err != nil {
-		return zoning.NilPacket, fmt.Errorf("[AuthIngress] key derivation failed: %v", err)
-	} */
 	tr, err := NewTR()
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] could not create transformer: %v", err)
@@ -62,8 +55,7 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] verification failed: %v", err)
 	}
-	pkt.RawDstZone = ad[1:4]
-	ts := time.Unix(int64(binary.LittleEndian.Uint32(ad[4:])), 0)
+	ts := time.Unix(int64(binary.LittleEndian.Uint32(ad[timeOffset:])), 0)
 	err = m.checkTime(ts)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] verification failed: %v", err)
@@ -71,17 +63,17 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	return pkt, nil
 }
 func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
-	ad := make([]byte, 8)
-	copy(ad[:1], version)
+	ad := make([]byte, headerLength)
+	copy(ad[:typeOffset+typeLength], version)
 	buf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(buf, pkt.DstZone)
-	copy(ad[1:4], buf)
-	binary.LittleEndian.PutUint32(ad[4:], uint32(time.Now().Unix()))
+	copy(ad[zoneOffset:zoneOffset+zoneLength], buf)
+	binary.LittleEndian.PutUint32(ad[timeOffset:], uint32(time.Now().Unix()))
 
 	if pkt.RemoteTP == "" {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] destination TP address not set in packet")
 	}
-	key, fresh, err := m.km.FetchL2Key(pkt.RemoteTP, pkt.RawDstZone)
+	key, fresh, err := m.km.FetchL2Key(pkt.RemoteTP, buf[:3])
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("[AuthEgress] fetching L1 key for %v failed: %v", pkt.RemoteTP, err)
 	}

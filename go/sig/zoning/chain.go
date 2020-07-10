@@ -34,13 +34,12 @@ func (c *Chain) Handle(pkt Packet) (Packet, error) {
 
 // Packet contains a raw IP packet with additional meta data
 type Packet struct {
-	Ingress    bool
-	SrcHost    net.IP
-	DstHost    net.IP
-	RemoteTP   string
-	DstZone    uint32
-	RawDstZone common.RawBytes
-	RawPacket  common.RawBytes
+	Ingress   bool
+	SrcHost   net.IP
+	DstHost   net.IP
+	RemoteTP  string
+	DstZone   uint32
+	RawPacket common.RawBytes
 }
 
 // NilPacket is the empty Packet
