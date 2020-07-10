@@ -20,7 +20,6 @@
 package auth
 
 import (
-	"crypto/cipher"
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
@@ -31,37 +30,38 @@ import (
 )
 
 var headerLength = 8
+var typeOffset = 0
+var zoneOffset = 1
+var timeOffset = 4
 
 var _ = Transformer(&TR{})
 
 // TR implements the Transformer interface
 type TR struct {
-	aead        cipher.AEAD
+	//aead cipher.AEAD
+	//nonceSize   int
 	nonceCtr    uint64
 	maxNonceCtr uint64
 	nonceRnd    []byte
-	mutex       sync.Mutex
+	///mutex       sync.Mutex
+	once sync.Once
 }
 
 // NewTR creates a new Transformer
-func NewTR(key []byte) (*TR, error) {
-	aead, err := newAEAD(key)
-	if err != nil {
-		return nil, err
-	}
+func NewTR() (*TR, error) {
 
 	var maxCtr uint64
 	var rndSize int
-	if aead.NonceSize() >= 8 {
+	if nonceSize() >= 8 {
 		maxCtr = math.MaxUint64
-		rndSize = aead.NonceSize() - 8
+		rndSize = nonceSize() - 8
 	} else {
-		maxCtr = uint64(1<<(aead.NonceSize()*8) - 1)
+		maxCtr = uint64(1<<(nonceSize()*8) - 1)
 		rndSize = 0
 	}
 
 	tr := &TR{
-		aead:        aead,
+		//aead:        aead,
 		nonceCtr:    0,
 		maxNonceCtr: maxCtr,
 	}
@@ -75,44 +75,57 @@ func NewTR(key []byte) (*TR, error) {
 // Overhead is the number of additional bytes added to the original IP
 // packet when transformed to intermediate representation.
 func (t *TR) Overhead() int {
-	return t.aead.NonceSize() + t.aead.Overhead() + headerLength
+	return nonceSize() + tagSize() + headerLength
 }
 
 // ToIR transforms an IP packet to intermediate representation
-func (t *TR) ToIR(packet, additionalData []byte) ([]byte, error) {
-
+func (t *TR) ToIR(key, packet, additionalData []byte) ([]byte, error) {
 	// pre-allocating a buffer which can accomodate nonce, additionalData, ciphertext and tag
 	// makes sure encryption does not copy data unnecessarily
-	nonceSize := t.aead.NonceSize()
+	nonceSize := nonceSize()
 	dst := make([]byte, len(packet)+t.Overhead())
-	nonce := dst[:nonceSize]
+	nonce := dst[headerLength : headerLength+nonceSize]
 
 	// fetch a fresh nonce
 	err := t.nextNonce(nonce)
 	if err != nil {
 		return nil, err
 	}
-
-	copy(dst[nonceSize:nonceSize+headerLength], additionalData)
-	buf := t.aead.Seal(dst[:nonceSize+headerLength], nonce, packet, additionalData)
+	copy(dst[:headerLength], additionalData)
+	aead, err := newAEAD(key)
+	if err != nil {
+		return nil, err
+	}
+	buf := aead.Seal(dst[:headerLength+nonceSize], nonce, packet, additionalData)
 	return buf, nil
 }
 
 // FromIR transforms data back to an IP packet
-func (t *TR) FromIR(message []byte) (additionalData []byte, packet []byte, err error) {
-	nonceSize := t.aead.NonceSize()
+func (t *TR) FromIR(key, message []byte) (additionalData []byte, packet []byte, err error) {
+	nonceSize := nonceSize()
 	//TODO: check message size before slicing
-	nonce, additionalData, cipher := message[:nonceSize], message[nonceSize:nonceSize+headerLength], message[nonceSize+headerLength:]
-	plaintext, err := t.aead.Open(cipher[:0], nonce, cipher, additionalData)
+	additionalData, nonce, cipher := message[:headerLength], message[headerLength:nonceSize+headerLength], message[nonceSize+headerLength:]
+	aead, err := newAEAD(key)
+	if err != nil {
+		return nil, nil, err
+	}
+	plaintext, err := aead.Open(cipher[:0], nonce, cipher, additionalData)
 	if err != nil {
 		return nil, nil, err
 	}
 	return additionalData, plaintext, nil
 }
 
+// TODO: needed?
 // UpdateKey updates the key for the encryption used by Transformer
 func (t *TR) UpdateKey() error {
 	return errors.New("not implemented")
+}
+
+// GetZone extracts the zone infromation from the encrypted packet
+func GetZone(message []byte) []byte {
+	//TODO: check message size before slicing
+	return message[zoneOffset:timeOffset]
 }
 
 // nextNonce creates a new, unique nonce.

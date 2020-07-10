@@ -184,6 +184,20 @@ func (km *KeyMan) FetchL1Key(remote string) ([]byte, bool, error) {
 	return key, fresh, nil
 }
 
+// FetchL2Key fetches the Level-2 key used to encrypt outgoing traffic
+func (km *KeyMan) FetchL2Key(remote string, zone []byte) ([]byte, bool, error) {
+	l1, fresh, err := km.FetchL1Key(remote)
+	if err != nil {
+		return nil, false, err
+	}
+	mac, err := initMac(l1)
+	if err != nil {
+		return nil, false, err
+	}
+	mac.Write(zone)
+	return mac.Sum(nil), fresh, nil
+}
+
 func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
 	//TODO: this lock is bad because it serializes all requests, not just the ones going to the same destination
 	km.reqLock.Lock()
@@ -249,7 +263,7 @@ func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
 	return true, nil
 }
 
-// DeriveL1Key derives the Level-1 key used to verify incoming traffic
+// DeriveL1Key derives the Level-1 key used to derive the L2 key
 func (km *KeyMan) DeriveL1Key(remote string) ([]byte, error) {
 	k, _, err := km.deriveL1Key(remote)
 	if err != nil {
@@ -269,6 +283,20 @@ func (km *KeyMan) deriveL1Key(remote string) ([]byte, time.Time, error) {
 	}
 	io.WriteString(mac, remote)
 	return mac.Sum(nil), t, nil
+}
+
+// DeriveL2Key derives the Level-2 key used to verify incoming traffic
+func (km *KeyMan) DeriveL2Key(remote string, zone []byte) ([]byte, error) {
+	l1, _, err := km.deriveL1Key(remote)
+	if err != nil {
+		return nil, err
+	}
+	mac, err := initMac(l1)
+	if err != nil {
+		return nil, err
+	}
+	mac.Write(zone)
+	return mac.Sum(nil), nil
 }
 
 // ServeL1 starts a server handling incoming Level-1 key requests

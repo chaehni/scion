@@ -20,6 +20,16 @@ func newAEAD(key []byte) (cipher.AEAD, error) {
 	return gcm, nil
 }
 
+// nonceSize must return the nonce size of the AEAD returned by newAEAD
+func nonceSize() int {
+	return 12
+}
+
+// nonceSize must return the tag size of the AEAD returned by newAEAD
+func tagSize() int {
+	return 16
+}
+
 func initMac(key []byte) (hash.Hash, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {

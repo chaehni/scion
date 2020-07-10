@@ -44,16 +44,21 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	if pkt.RemoteTP == "" {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] source TP address not set in packet")
 	}
-	key, err := m.km.DeriveL1Key(pkt.RemoteTP)
+	/* key, err := m.km.DeriveL1Key(pkt.RemoteTP)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] key derivation failed: %v", err)
-	}
-	tr, err := NewTR(key)
+	} */
+	tr, err := NewTR()
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] could not create transformer: %v", err)
 	}
 	var ad []byte
-	ad, pkt.RawPacket, err = tr.FromIR(pkt.RawPacket)
+	zone := GetZone(pkt.RawPacket)
+	key, err := m.km.DeriveL2Key(pkt.RemoteTP, zone)
+	if err != nil {
+		return zoning.NilPacket, fmt.Errorf("[AuthIngress] key derivation failed: %v", err)
+	}
+	ad, pkt.RawPacket, err = tr.FromIR(key, pkt.RawPacket)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] verification failed: %v", err)
 	}
@@ -74,12 +79,12 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	if pkt.RemoteTP == "" {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] destination TP address not set in packet")
 	}
-	key, fresh, err := m.km.FetchL1Key(pkt.RemoteTP)
+	key, fresh, err := m.km.FetchL2Key(pkt.RemoteTP, pkt.RawDstZone)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("[AuthEgress] fetching L1 key for %v failed: %v", pkt.RemoteTP, err)
 	}
 	if fresh {
-		tr, err := NewTR(key)
+		tr, err := NewTR()
 		if err != nil {
 			// how to handle? Next time we try fresh will be false and we don't set it here anymore
 			return zoning.NilPacket, err
@@ -94,7 +99,7 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	if !ok {
 		return zoning.NilPacket, fmt.Errorf("[AuthEgress] transformer not found in cache: %v", err)
 	}
-	pkt.RawPacket, err = tr.(*TR).ToIR(pkt.RawPacket, ad)
+	pkt.RawPacket, err = tr.(*TR).ToIR(key, pkt.RawPacket, ad)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("[AuthEgress] proof creation failed: %v", err)
 	}
