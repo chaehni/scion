@@ -58,17 +58,11 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	return pkt, nil
 }
 func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
-	ad := make([]byte, headerLength)
-	copy(ad[:typeOffset+typeLength], version)
-	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, pkt.DstZone)
-	copy(ad[zoneOffset:zoneOffset+zoneLength], buf)
-	binary.LittleEndian.PutUint32(ad[timeOffset:], uint32(time.Now().Unix()))
-
 	if pkt.RemoteTP == "" {
 		return zoning.NilPacket, fmt.Errorf("[AuthIngress] destination TP address not set in packet")
 	}
-	key, fresh, err := m.km.FetchL2Key(pkt.RemoteTP, buf[:3])
+	ad := m.buildHeader(pkt.DstZone)
+	key, fresh, err := m.km.FetchL2Key(pkt.RemoteTP, ad[zoneOffset:zoneOffset+zoneLength])
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("[AuthEgress] fetching L1 key for %v failed: %v", pkt.RemoteTP, err)
 	}
@@ -84,6 +78,16 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 		return zoning.NilPacket, fmt.Errorf("[AuthEgress] proof creation failed: %v", err)
 	}
 	return pkt, nil
+}
+
+func (m *Module) buildHeader(zone uint32) []byte {
+	ad := make([]byte, headerLength)
+	copy(ad[typeOffset:typeOffset+typeLength], version)
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, zone)
+	copy(ad[zoneOffset:zoneOffset+zoneLength], buf)
+	binary.LittleEndian.PutUint32(ad[timeOffset:], uint32(time.Now().Unix()))
+	return ad
 }
 
 func (m *Module) checkTime(t time.Time) error {
