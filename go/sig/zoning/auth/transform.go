@@ -19,16 +19,6 @@
 
 package auth
 
-import (
-	"crypto/rand"
-	"encoding/binary"
-	"errors"
-	"io"
-	"math"
-	"sync"
-	"sync/atomic"
-)
-
 // version should be increased when breaking changes are made
 var version = []byte{1}
 var headerLength = 8
@@ -39,18 +29,17 @@ var zoneLength = 3
 var timeOffset = 4
 var timeLength = 4
 
-var _ = Transformer(&TR{})
+//var _ = Transformer(&TR{})
 
 // TR implements the Transformer interface
-type TR struct {
+/* type TR struct {
 	nonceCtr    uint64
 	maxNonceCtr uint64
 	nonceRnd    []byte
-	once        sync.Once
-}
+} */
 
 // NewTR creates a new Transformer
-func NewTR() (*TR, error) {
+/* func NewTR() (*TR, error) {
 
 	var maxCtr uint64
 	var rndSize int
@@ -71,28 +60,29 @@ func NewTR() (*TR, error) {
 		return nil, err
 	}
 	return tr, nil
-}
+} */
 
 // Overhead is the number of additional bytes added to the original IP
 // packet when transformed to intermediate representation.
-func (t *TR) Overhead() int {
+func Overhead() int {
 	return nonceSize() + tagSize() + headerLength
 }
 
 // ToIR transforms an IP packet to intermediate representation
-func (t *TR) ToIR(key, packet, additionalData []byte) ([]byte, error) {
+func ToIR(key, nonce, packet, additionalData []byte) ([]byte, error) {
 	// pre-allocating a buffer which can accomodate nonce, additionalData, ciphertext and tag
 	// makes sure encryption does not copy data unnecessarily
 	nonceSize := nonceSize()
-	dst := make([]byte, len(packet)+t.Overhead())
-	nonce := dst[headerLength : headerLength+nonceSize]
+	dst := make([]byte, len(packet)+Overhead())
+	//nonce := dst[headerLength : headerLength+nonceSize]
 
-	// fetch a fresh nonce
+	/* // fetch a fresh nonce
 	err := t.nextNonce(nonce)
 	if err != nil {
 		return nil, err
-	}
+	} */
 	copy(dst[:headerLength], additionalData)
+	copy(dst[headerLength:headerLength+nonceSize], nonce)
 	aead, err := newAEAD(key)
 	if err != nil {
 		return nil, err
@@ -102,7 +92,7 @@ func (t *TR) ToIR(key, packet, additionalData []byte) ([]byte, error) {
 }
 
 // FromIR transforms data back to an IP packet
-func (t *TR) FromIR(key, message []byte) (additionalData []byte, packet []byte, err error) {
+func FromIR(key, message []byte) (additionalData []byte, packet []byte, err error) {
 	nonceSize := nonceSize()
 	//TODO: check message size before slicing
 	additionalData, nonce, cipher := message[:headerLength], message[headerLength:nonceSize+headerLength], message[nonceSize+headerLength:]
@@ -121,26 +111,4 @@ func (t *TR) FromIR(key, message []byte) (additionalData []byte, packet []byte, 
 func GetZone(message []byte) []byte {
 	//TODO: check message size before slicing
 	return message[zoneOffset:timeOffset]
-}
-
-// nextNonce creates a new, unique nonce.
-// The returned nonce is the little-endian byte representation of a nonce counter.
-// In case the nonce is longer than 8 bytes the remaining capacity is filled with random bytes
-func (t *TR) nextNonce(buf []byte) error {
-
-	// atomically get next nonce counter
-	for {
-		old := t.nonceCtr
-		new := old + 1
-		if old == t.maxNonceCtr {
-			return errors.New("nonce reached max count, new key required")
-		}
-		if atomic.CompareAndSwapUint64(&t.nonceCtr, old, new) {
-			bs := make([]byte, 8)
-			binary.LittleEndian.PutUint64(bs, new)
-			n := copy(buf, bs)
-			copy(buf[n:], t.nonceRnd)
-			return nil
-		}
-	}
 }
