@@ -122,7 +122,8 @@ func realMain() int {
 	// auth modules
 	keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf)
 	keyman.ServeL1()
-	am := auth.NewModule(keyman, cfg.TP.AuthConf)
+	transformer := auth.NewTR()
+	am := auth.NewModule(keyman, transformer, cfg.TP.AuthConf)
 
 	// transfer module
 	tm, err := transfer.New(cfg.Sig.IA, cfg.Sig.IP, cfg.TP.TransConf)

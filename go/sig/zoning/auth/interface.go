@@ -16,6 +16,7 @@ type KeyManager interface {
 
 // Transformer transforms IP packets to and from intermediate representation
 type Transformer interface {
-	ToIR(key, packet, additionalData []byte) ([]byte, error)
-	FromIR(key, message []byte) (additionalData []byte, packet []byte, err error)
+	ToIR(remote string, key, packet, additionalData []byte) ([]byte, error)
+	FromIR(key, cipher []byte) (additionalData []byte, packet []byte, err error)
+	ResetState(remote string) error
 }
