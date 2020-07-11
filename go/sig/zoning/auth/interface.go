@@ -7,16 +7,17 @@ type KeyManager interface {
 	// has been fetched from remote.
 	FetchL1Key(remote string) ([]byte, bool, error)
 	// FetchL2Key fetches the Level-2 key used to encrypt outgoing traffic
-	FetchL2Key(remote string, zone []byte) ([]byte, bool, error)
+	FetchL2Key(remote string, zone uint32) ([]byte, bool, error)
 	// Derive L1Key derives the level 1 key used to derive the L2 key.
 	DeriveL1Key(remote string) ([]byte, error)
 	// Derive L2Key derives the level 2 key used to verify incoming traffic.
-	DeriveL2Key(remote string, zone []byte) ([]byte, error)
+	DeriveL2Key(remote string, zone uint32) ([]byte, error)
 }
 
 // Transformer transforms IP packets to and from intermediate representation
 type Transformer interface {
-	ToIR(remote string, key, packet, additionalData []byte) ([]byte, error)
+	ToIR(remote string, key, packet []byte, dstZone uint32) ([]byte, error)
 	FromIR(key, cipher []byte) (additionalData []byte, packet []byte, err error)
 	ResetState(remote string) error
+	GetZone(message []byte) uint32
 }

@@ -26,6 +26,7 @@ import (
 	"io"
 	"math"
 	"sync/atomic"
+	"time"
 
 	"github.com/patrickmn/go-cache"
 )
@@ -126,7 +127,7 @@ func (t *TR) resetState(remote string) (*nonceState, error) {
 }
 
 // ToIR transforms an IP packet to intermediate representation
-func (t *TR) ToIR(remote string, key, packet, additionalData []byte) ([]byte, error) {
+func (t *TR) ToIR(remote string, key, packet []byte, dstZone uint32) ([]byte, error) {
 	// get nonce state for remote
 	var ns interface{}
 	var err error
@@ -142,10 +143,10 @@ func (t *TR) ToIR(remote string, key, packet, additionalData []byte) ([]byte, er
 	// makes sure encryption does not copy data unnecessarily
 	dst := make([]byte, len(packet)+t.Overhead())
 	nonceSize := nonceSize()
-	ad := dst[:headerLength]
-	nonce := dst[headerLength : headerLength+nonceSize]
-	copy(ad, additionalData)
-	err = ns.(*nonceState).nextNonce(nonce)
+	adSlice := dst[:headerLength]
+	copy(adSlice, t.buildHeader(dstZone))
+	nonceSlice := dst[headerLength : headerLength+nonceSize]
+	err = ns.(*nonceState).nextNonce(nonceSlice)
 	if err != nil {
 		return nil, err
 	}
@@ -153,8 +154,18 @@ func (t *TR) ToIR(remote string, key, packet, additionalData []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	buf := aead.Seal(dst[:headerLength+nonceSize], nonce, packet, additionalData)
+	buf := aead.Seal(dst[:headerLength+nonceSize], nonceSlice, packet, adSlice)
 	return buf, nil
+}
+
+func (t *TR) buildHeader(zone uint32) []byte {
+	ad := make([]byte, headerLength)
+	copy(ad[typeOffset:typeOffset+typeLength], version)
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, zone)
+	copy(ad[zoneOffset:zoneOffset+zoneLength], buf)
+	binary.LittleEndian.PutUint32(ad[timeOffset:], uint32(time.Now().Unix()))
+	return ad
 }
 
 // FromIR transforms data back to an IP packet
@@ -174,7 +185,9 @@ func (t *TR) FromIR(key, message []byte) (additionalData []byte, packet []byte, 
 }
 
 // GetZone extracts the zone infromation from the encrypted packet
-func GetZone(message []byte) []byte {
+func (t *TR) GetZone(message []byte) uint32 {
 	//TODO: check message size before slicing
-	return message[zoneOffset:timeOffset]
+	zone := uint32(message[zoneOffset]) | uint32(message[zoneOffset+1])<<8 |
+		uint32(message[zoneOffset+2])<<16
+	return zone
 }

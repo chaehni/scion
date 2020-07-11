@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -185,7 +186,7 @@ func (km *KeyMan) FetchL1Key(remote string) ([]byte, bool, error) {
 }
 
 // FetchL2Key fetches the Level-2 key used to encrypt outgoing traffic
-func (km *KeyMan) FetchL2Key(remote string, zone []byte) ([]byte, bool, error) {
+func (km *KeyMan) FetchL2Key(remote string, zone uint32) ([]byte, bool, error) {
 	l1, fresh, err := km.FetchL1Key(remote)
 	if err != nil {
 		return nil, false, err
@@ -194,7 +195,9 @@ func (km *KeyMan) FetchL2Key(remote string, zone []byte) ([]byte, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
-	mac.Write(zone)
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, zone)
+	mac.Write(buf[:3])
 	return mac.Sum(nil), fresh, nil
 }
 
@@ -286,7 +289,7 @@ func (km *KeyMan) deriveL1Key(remote string) ([]byte, time.Time, error) {
 }
 
 // DeriveL2Key derives the Level-2 key used to verify incoming traffic
-func (km *KeyMan) DeriveL2Key(remote string, zone []byte) ([]byte, error) {
+func (km *KeyMan) DeriveL2Key(remote string, zone uint32) ([]byte, error) {
 	l1, _, err := km.deriveL1Key(remote)
 	if err != nil {
 		return nil, err
@@ -295,7 +298,9 @@ func (km *KeyMan) DeriveL2Key(remote string, zone []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	mac.Write(zone)
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, zone)
+	mac.Write(buf[:3])
 	return mac.Sum(nil), nil
 }
 
