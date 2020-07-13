@@ -85,7 +85,6 @@ type KeyMan struct {
 
 // NewKeyMan creates a new Keyman
 func NewKeyMan(masterSecret []byte, listenIP net.IP, cfg tpconfig.AuthConf) *KeyMan {
-
 	ds := reliable.NewDispatcher("")
 	sciondConn, err := sciond.NewService(sciond.DefaultSCIONDAddress).Connect(context.Background())
 	if err != nil {
@@ -168,17 +167,17 @@ func (km *KeyMan) FetchL1Key(remote string) ([]byte, bool, error) {
 		return nil, false, errors.New("remote cannot be empty")
 	}
 	// fetch key in case it is missing or has expired
-	_, t, ok := km.keyCache.GetWithExpiration(remote)
+	x, t, ok := km.keyCache.GetWithExpiration(remote)
 	if !ok || t.Before(time.Now()) {
-		fresh, err = km.fetchL1FromRemote(remote)
+		x, fresh, err = km.fetchL1FromRemote(remote)
 		if err != nil {
 			return nil, false, err
 		}
 	}
-	x, ok := km.keyCache.Get(remote)
-	if !ok {
-		return nil, false, errors.New("fetching key failed") // Should never happen, we just fetched it
-	}
+	/* 	x, ok := km.keyCache.Get(remote)
+	   	if !ok {
+	   		return nil, false, errors.New("fetching key failed") // Should never happen, we just fetched it
+	   	} */
 	l1 := x.([]byte)
 	key := make([]byte, km.keyLength)
 	copy(key, l1)
@@ -201,28 +200,28 @@ func (km *KeyMan) FetchL2Key(remote string, zone uint32) ([]byte, bool, error) {
 	return mac.Sum(nil), fresh, nil
 }
 
-func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
+func (km *KeyMan) fetchL1FromRemote(remote string) ([]byte, bool, error) {
 	//TODO: this lock is bad because it serializes all requests, not just the ones going to the same destination
 	km.reqLock.Lock()
 	defer km.reqLock.Unlock()
 
 	// check if in the meantime another goroutine successfully fetched the key
-	_, t, ok := km.keyCache.GetWithExpiration(remote)
+	l1, t, ok := km.keyCache.GetWithExpiration(remote)
 	if ok && t.After(time.Now()) {
-		return false, nil
+		return l1.([]byte), false, nil
 	}
 
 	remoteCpy, err := snet.ParseUDPAddr(remote)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	remoteCpy.Host.Port = km.listenPort
 	paths, err := km.querier.Query(context.Background(), remoteCpy.IA)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	if len(paths) == 0 {
-		return false, fmt.Errorf("no paths found for remote %v", remote)
+		return nil, false, fmt.Errorf("no paths found for remote %v", remote)
 	}
 	remoteCpy.Path = paths[0].Path()
 	remoteCpy.NextHop = paths[0].OverlayNextHop()
@@ -230,40 +229,40 @@ func (km *KeyMan) fetchL1FromRemote(remote string) (bool, error) {
 	listen := &net.UDPAddr{IP: km.listenIP, Port: 0}
 	sess, err := squic.Dial(km.scionNet, listen, remoteCpy, addr.SvcNone, nil)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	defer sess.Close()
 	stream, err := sess.OpenStreamSync()
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	defer stream.Close()
 
 	io.WriteString(stream, "get-key")
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 
 	// fetch key
-	var l1 keyPld
+	var l1Pld keyPld
 	decoder := json.NewDecoder(stream)
-	decoder.Decode(&l1)
+	decoder.Decode(&l1Pld)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 
 	// check if we indeed got a valid key
-	if len(l1.key) != km.keyLength {
-		return false, fmt.Errorf("fetched key has invalid length %d", len(l1.key))
+	if len(l1Pld.key) != km.keyLength {
+		return nil, false, fmt.Errorf("fetched key has invalid length %d", len(l1Pld.key))
 	}
-	if l1.ttl.Before(time.Now()) {
-		return false, errors.New("fetched key is expired")
+	if l1Pld.ttl.Before(time.Now()) {
+		return nil, false, errors.New("fetched key is expired")
 	}
 	log.Debug("[AuthModule Fetcher] successfully fetched L1 key from", "remote", remote)
 
 	// set key with TTL
-	km.keyCache.Set(remote, l1.key, l1.ttl.Sub(time.Now()))
-	return true, nil
+	km.keyCache.Set(remote, l1Pld.key, l1Pld.ttl.Sub(time.Now()))
+	return l1Pld.key, true, nil
 }
 
 // DeriveL1Key derives the Level-1 key used to derive the L2 key
