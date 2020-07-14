@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"io/ioutil"
 	"net"
@@ -81,6 +82,8 @@ type KeyMan struct {
 	listenIP   net.IP
 	listenPort int
 	reqLock    sync.Mutex
+
+	mac hash.Hash
 }
 
 // NewKeyMan creates a new Keyman
@@ -152,9 +155,14 @@ func (km *KeyMan) refreshL0() error {
 	if len(km.ms) == 0 {
 		return errors.New("master secret cannot be empty")
 	}
-	key := pbkdf2.Key(km.ms, l0Salt, 1000, 12, sha256.New)
+	key := pbkdf2.Key(km.ms, l0Salt, 1000, km.keyLength, sha256.New)
 	km.l0 = key
 	km.l0TTL = time.Now().Add(km.keyTTL)
+	var err error
+	km.mac, err = initMac(km.l0)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -275,16 +283,13 @@ func (km *KeyMan) DeriveL1Key(remote string) ([]byte, error) {
 }
 
 func (km *KeyMan) deriveL1Key(remote string) ([]byte, time.Time, error) {
-	l0, t, err := km.getL0Key()
+	_, t, err := km.getL0Key()
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	mac, err := initMac(l0)
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	io.WriteString(mac, remote)
-	return mac.Sum(nil), t, nil
+	defer km.mac.Reset()
+	io.WriteString(km.mac, remote)
+	return km.mac.Sum(nil), t, nil
 }
 
 // DeriveL2Key derives the Level-2 key used to verify incoming traffic
