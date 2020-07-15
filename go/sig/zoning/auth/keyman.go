@@ -102,7 +102,7 @@ func NewKeyMan(masterSecret []byte, listenIP net.IP, cfg tpconfig.AuthConf) *Key
 	if err != nil {
 		fmt.Println(err)
 	}
-	err = squic.Init("key.pem", "cert.pem")
+	err = squic.Init(cfg.Key, cfg.Cert)
 	if err != nil {
 		panic(err)
 	}
