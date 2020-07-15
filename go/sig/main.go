@@ -117,10 +117,10 @@ func realMain() int {
 	core := zoning.NewCoreModule(cfg.Sig.IA, cfg.Sig.IP)
 
 	// auth modules
-	/* keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf)
+	keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf)
 	keyman.ServeL1()
 	transformer := auth.NewTR()
-	am := auth.NewModule(keyman, transformer, cfg.TP.AuthConf) */
+	am := auth.NewModule(keyman, transformer, cfg.TP.AuthConf)
 
 	// transfer module
 	tm, err := transfer.New(cfg.Sig.IA, cfg.Sig.IP, cfg.TP.TransConf)
@@ -129,8 +129,8 @@ func realMain() int {
 	}
 
 	// register modules
-	egressChain.Register(core, tm)
-	ingressChain.Register(core, tm)
+	egressChain.Register(core, tm, am)
+	ingressChain.Register(am, core, tm)
 	auth.Init()
 	/* End of Zoning */
 
