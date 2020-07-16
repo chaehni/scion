@@ -134,7 +134,7 @@ func realMain() int {
 	auth.Init()
 	/* End of Zoning */
 
-	egress.Init(tunIO, egressChain)
+	egress.Init(tunIO)
 	ingress.Init(tunIO, ingressChain)
 	http.HandleFunc("/config", configHandler)
 	http.HandleFunc("/info", env.InfoHandler)

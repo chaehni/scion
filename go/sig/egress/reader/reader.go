@@ -23,8 +23,6 @@ import (
 	"net"
 	"os"
 
-	"github.com/scionproto/scion/go/sig/zoning"
-
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/ringbuf"
@@ -36,7 +34,6 @@ import (
 const (
 	ip4Ver    = 0x4
 	ip6Ver    = 0x6
-	ip4SrcOff = 12
 	ip4DstOff = 16
 	ip6DstOff = 24
 )
@@ -44,11 +41,10 @@ const (
 type Reader struct {
 	log   log.Logger
 	tunIO io.ReadWriteCloser
-	chain zoning.Chain
 }
 
-func NewReader(tunIO io.ReadWriteCloser, chain zoning.Chain) *Reader {
-	return &Reader{log: log.New(), tunIO: tunIO, chain: chain}
+func NewReader(tunIO io.ReadWriteCloser) *Reader {
+	return &Reader{log: log.New(), tunIO: tunIO}
 }
 
 func (r *Reader) Run() {
@@ -61,7 +57,6 @@ BatchLoop:
 			break
 		}
 		for i := 0; i < n; i++ {
-
 			buf := bufs[i].(common.RawBytes)
 			bufs[i] = nil
 			buf = buf[:cap(buf)]
@@ -81,35 +76,28 @@ BatchLoop:
 				r.log.Error("EgressReader: error reading from TUN device", "err", err)
 				continue
 			}
-			/* go func() { */
 			buf = buf[:length]
-
-			pkt, err := r.chain.Handle(zoning.Packet{Ingress: false, RawPacket: buf})
+			dstIP, err := r.getDestIP(buf)
 			if err != nil {
 				// Release buffer back to free buffer pool
 				iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
 				// FIXME(kormat): replace with metric.
-				r.log.Error("EgressReader: zoning error", "err", err)
-				//continue
-				return
+				r.log.Error("EgressReader: unable to get dest IP", "err", err)
+				continue
 			}
-			buf = pkt.RawPacket
-
-			dstIA, dstRing := router.NetMap.Lookup(pkt.DstHost)
+			dstIA, dstRing := router.NetMap.Lookup(dstIP)
 			if dstRing == nil {
 				// Release buffer back to free buffer pool
 				iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
 				metrics.PktUnroutable.Inc()
-				r.log.Error("EgressReader: unable to find dest IA", "ip", pkt.DstHost)
-				//continue
-				return
+				r.log.Error("EgressReader: unable to find dest IA", "ip", dstIP)
+				continue
 			}
 			if n, _ := dstRing.Write(ringbuf.EntryList{buf}, false); n != 1 {
 				// Release buffer back to free buffer pool
 				iface.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
 				metrics.EgressRxQueueFull.WithLabelValues(dstIA.String()).Inc()
 			}
-			//}()
 		}
 	}
 	r.log.Info("EgressReader: stopping")
@@ -120,18 +108,6 @@ func (r *Reader) getDestIP(b common.RawBytes) (net.IP, error) {
 	switch ver {
 	case ip4Ver:
 		return net.IP(b[ip4DstOff : ip4DstOff+net.IPv4len]), nil
-	case ip6Ver:
-		return net.IP(b[ip6DstOff : ip6DstOff+net.IPv6len]), nil
-	default:
-		return nil, common.NewBasicError("Unsupported IP protocol version in egress packet", nil,
-			"type", ver)
-	}
-}
-func (r *Reader) getSrcIP(b common.RawBytes) (net.IP, error) {
-	ver := (b[0] >> 4)
-	switch ver {
-	case ip4Ver:
-		return net.IP(b[ip4SrcOff : ip4SrcOff+net.IPv4len]), nil
 	case ip6Ver:
 		return net.IP(b[ip6DstOff : ip6DstOff+net.IPv6len]), nil
 	default:
