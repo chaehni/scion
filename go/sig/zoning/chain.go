@@ -6,6 +6,9 @@ import (
 	"github.com/scionproto/scion/go/lib/common"
 )
 
+var EgressChain Chain
+var IngressChain Chain
+
 // Chain is a pipeline of modules which is traversed by each packet
 type Chain struct {
 	modules []Module

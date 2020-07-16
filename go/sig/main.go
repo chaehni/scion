@@ -97,6 +97,7 @@ func realMain() int {
 		},
 	)
 	sigdisp.Init(sigcmn.CtrlConn, false)
+
 	// Parse sig config
 	if loadConfig(cfg.Sig.SIGConfig) != true {
 		log.Crit("Unable to load sig config on startup")
@@ -110,7 +111,7 @@ func realMain() int {
 
 	/* Start of Zoning */
 	// create chain of modules
-	egressChain := zoning.Chain{}
+	// egressChain := zoning.Chain{}
 	ingressChain := zoning.Chain{}
 
 	// core module
@@ -129,7 +130,7 @@ func realMain() int {
 	}
 
 	// register modules
-	egressChain.Register(core, tm, am)
+	zoning.EgressChain.Register(core, tm, am)
 	ingressChain.Register(am, core, tm)
 	auth.Init()
 	/* End of Zoning */

@@ -20,6 +20,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/scionproto/scion/go/sig/zoning"
+
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/ctrl/sig_mgmt"
@@ -124,7 +126,14 @@ TopLoop:
 		// Process buffered packets.
 		for i := range w.pkts {
 			pkt := w.pkts[i].(common.RawBytes)
-			if err := w.processPkt(f, pkt); err != nil {
+
+			// Pipeline
+			hpkt, err := zoning.EgressChain.Handle(zoning.Packet{Ingress: false, RawPacket: pkt})
+			if err != nil {
+				w.Error("Zoning error", "err", err)
+			}
+
+			if err := w.processPkt(f, hpkt.RawPacket); err != nil {
 				w.Error("Error sending frame", "err", err)
 			}
 		}
