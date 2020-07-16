@@ -1,0 +1,21 @@
+--- # Tiny Topology IPv4 only
+ASes:
+  "1-ff00:0:111":
+    core: true
+    voting: true
+    authoritative: true
+    issuing: true
+    mtu: 1500
+  "1-ff00:0:112":
+    cert_issuer: 1-ff00:0:111
+  "1-ff00:0:113":
+    cert_issuer: 1-ff00:0:111
+links:
+  - {a: "1-ff00:0:111-1", b: "1-ff00:0:112-2", linkAtoB: CHILD, mtu: 1500}
+  - {a: "1-ff00:0:111-1", b: "1-ff00:0:113-3", linkAtoB: CHILD, mtu: 1500}
+  - {a: "1-ff00:0:112-2", b: "1-ff00:0:113-3", linkAtoB: PEER, mtu: 1500}
+CAs:
+  CA1-1:
+    ISD: 1
+    commonName: CA1-1
+
