@@ -3,7 +3,6 @@ package tpconfig
 const idSample = "tp"
 
 const tpSample = `
-[tp]
 [tp.auth_module]
 key = "path"
 cert = "path"

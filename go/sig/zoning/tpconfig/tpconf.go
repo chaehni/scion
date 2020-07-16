@@ -25,7 +25,7 @@ func (cfg *TPConf) Sample(dst io.Writer, path config.Path, m config.CtxMap) {
 }
 
 func (cfg *TPConf) ConfigName() string {
-	return "tp_connection"
+	return "tp"
 }
 
 // AuthConf configures the authentication module

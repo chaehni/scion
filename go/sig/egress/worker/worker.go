@@ -131,6 +131,7 @@ TopLoop:
 			hpkt, err := zoning.EgressChain.Handle(zoning.Packet{Ingress: false, RawPacket: pkt})
 			if err != nil {
 				w.Error("Zoning error", "err", err)
+				continue
 			}
 
 			if err := w.processPkt(f, hpkt.RawPacket); err != nil {

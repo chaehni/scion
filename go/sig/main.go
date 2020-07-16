@@ -24,6 +24,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/user"
+	"strings"
 	"sync/atomic"
 
 	"github.com/BurntSushi/toml"
@@ -61,9 +62,16 @@ func main() {
 	os.Exit(realMain())
 }
 
+var (
+	ingressChain string
+	egressChain  string
+)
+
 func realMain() int {
 	fatal.Init()
 	env.AddFlags()
+	flag.StringVar(&egressChain, "egress", "core,trans,log,auth", "configure the egress chain")
+	flag.StringVar(&ingressChain, "ingress", "auth,core,trans,log", "configure the ingress chain")
 	flag.Parse()
 	if v, ok := env.CheckFlags(&cfg); !ok {
 		return v
@@ -110,30 +118,7 @@ func realMain() int {
 	}()
 
 	/* Start of Zoning */
-	// create chain of modules
-	// egressChain := zoning.Chain{}
-	//ingressChain := zoning.Chain{}
-
-	// core module
-	core := zoning.NewCoreModule(cfg.Sig.IA, cfg.Sig.IP)
-
-	// transfer module
-	tm, err := transfer.New(cfg.Sig.IA, cfg.Sig.IP, cfg.TP.TransConf)
-	if err != nil {
-		panic(err)
-	}
-
-	// auth modules
-	/* keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf)
-	keyman.ServeL1()
-	transformer := auth.NewTR()
-	am := auth.NewModule(keyman, transformer, cfg.TP.AuthConf) */
-
-	// register modules
-	zoning.EgressChain.Register(core, tm)
-	zoning.IngressChain.Register(core, tm)
-	auth.Init()
-	/* End of Zoning */
+	setupModules()
 
 	egress.Init(tunIO)
 	ingress.Init(tunIO)
@@ -249,4 +234,50 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
 	toml.NewEncoder(&buf).Encode(cfg)
 	fmt.Fprint(w, buf.String())
+}
+
+var mods = make(map[string]zoning.Module)
+
+func setupModules() {
+	// create modules
+	// core module
+	cm := zoning.NewCoreModule(cfg.Sig.IA, cfg.Sig.IP)
+	mods["core"] = cm
+	tm, err := transfer.New(cfg.Sig.IA, cfg.Sig.IP, cfg.TP.TransConf)
+	if err != nil {
+		panic(err)
+	}
+	mods["trans"] = tm
+	keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf)
+	keyman.ServeL1()
+	transformer := auth.NewTR()
+	am := auth.NewModule(keyman, transformer, cfg.TP.AuthConf)
+	auth.Init()
+	mods["auth"] = am
+	lm := &zoning.LogModule{LocalTP: fmt.Sprintf("%v,%v", cfg.Sig.IA, cfg.Sig.IP)}
+	mods["log"] = lm
+
+	// create ingress chain
+	s := strings.Split(ingressChain, ",")
+	fmt.Println("[ingress chain]")
+	for _, m := range s {
+		md, ok := mods[m]
+		if !ok {
+			continue
+		}
+		zoning.IngressChain.Register(md)
+		fmt.Printf("	%v\n", m)
+	}
+
+	// create egress chain
+	s = strings.Split(egressChain, ",")
+	fmt.Println("[egress chain]")
+	for _, m := range s {
+		md, ok := mods[m]
+		if !ok {
+			continue
+		}
+		zoning.EgressChain.Register(md)
+		fmt.Printf("	%v\n", m)
+	}
 }

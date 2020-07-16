@@ -59,7 +59,7 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 
 func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	if pkt.RemoteTP == "" {
-		return zoning.NilPacket, fmt.Errorf("[AuthIngress] destination TP address not set in packet")
+		return zoning.NilPacket, fmt.Errorf("[AuthEgress] destination TP address not set in packet")
 	}
 	key, fresh, err := m.km.FetchL2Key(pkt.RemoteTP, pkt.DstZone)
 	if err != nil {
