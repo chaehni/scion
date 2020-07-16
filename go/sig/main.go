@@ -112,16 +112,10 @@ func realMain() int {
 	/* Start of Zoning */
 	// create chain of modules
 	// egressChain := zoning.Chain{}
-	ingressChain := zoning.Chain{}
+	//ingressChain := zoning.Chain{}
 
 	// core module
 	core := zoning.NewCoreModule(cfg.Sig.IA, cfg.Sig.IP)
-
-	// auth modules
-	keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf)
-	keyman.ServeL1()
-	transformer := auth.NewTR()
-	am := auth.NewModule(keyman, transformer, cfg.TP.AuthConf)
 
 	// transfer module
 	tm, err := transfer.New(cfg.Sig.IA, cfg.Sig.IP, cfg.TP.TransConf)
@@ -129,14 +123,20 @@ func realMain() int {
 		panic(err)
 	}
 
+	// auth modules
+	/* keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf)
+	keyman.ServeL1()
+	transformer := auth.NewTR()
+	am := auth.NewModule(keyman, transformer, cfg.TP.AuthConf) */
+
 	// register modules
-	zoning.EgressChain.Register(core, tm, am)
-	ingressChain.Register(am, core, tm)
+	zoning.EgressChain.Register(core, tm)
+	zoning.IngressChain.Register(core, tm)
 	auth.Init()
 	/* End of Zoning */
 
 	egress.Init(tunIO)
-	ingress.Init(tunIO, ingressChain)
+	ingress.Init(tunIO)
 	http.HandleFunc("/config", configHandler)
 	http.HandleFunc("/info", env.InfoHandler)
 	cfg.Metrics.StartPrometheus()

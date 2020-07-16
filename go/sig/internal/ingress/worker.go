@@ -50,11 +50,10 @@ type Worker struct {
 	markedForCleanup bool
 	sentCtrs         metrics.CtrPair
 	tunIO            io.ReadWriteCloser
-	chain            zoning.Chain
 }
 
 func NewWorker(remote *snet.UDPAddr, sessId sig_mgmt.SessionType,
-	tunIO io.ReadWriteCloser, chain zoning.Chain) *Worker {
+	tunIO io.ReadWriteCloser) *Worker {
 
 	worker := &Worker{
 		Logger: log.New("ingress", remote.String(), "sessId", sessId),
@@ -69,7 +68,6 @@ func NewWorker(remote *snet.UDPAddr, sessId sig_mgmt.SessionType,
 				sessId.String()),
 		},
 		tunIO: tunIO,
-		chain: chain,
 	}
 	return worker
 }
@@ -158,7 +156,8 @@ func (w *Worker) cleanup() {
 
 func (w *Worker) send(packet common.RawBytes) error {
 
-	pkt, err := w.chain.Handle(zoning.Packet{Ingress: true, RemoteTP: fmt.Sprintf("%s,%s", w.Remote.IA, w.Remote.Host.IP), RawPacket: packet})
+	pkt, err := zoning.IngressChain.Handle(
+		zoning.Packet{Ingress: true, RemoteTP: fmt.Sprintf("%s,%s", w.Remote.IA, w.Remote.Host.IP), RawPacket: packet})
 	if err != nil {
 		return err
 	}
