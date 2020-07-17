@@ -30,5 +30,10 @@ type Subnet struct {
 	TPAddr string
 }
 
+// Network implements the RangerEntry interface for use with github.com/yl2chen/cidranger
+func (s *Subnet) Network() net.IPNet {
+	return s.IPNet
+}
+
 // Subnets is a list of IP subnets
 type Subnets []*Subnet

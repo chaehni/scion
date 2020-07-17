@@ -10,6 +10,8 @@ import (
 	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
 )
 
+var _ = zoning.Module(&Module{})
+
 // Module implements the authentication module
 // It transforms IP packets to and from intermediate representation
 type Module struct {

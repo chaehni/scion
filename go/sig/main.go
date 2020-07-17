@@ -70,8 +70,8 @@ var (
 func realMain() int {
 	fatal.Init()
 	env.AddFlags()
-	flag.StringVar(&egressChain, "egress", "core,trans,log,auth", "configure the egress chain")
-	flag.StringVar(&ingressChain, "ingress", "auth,core,trans,log", "configure the ingress chain")
+	flag.StringVar(&egressChain, "egress", "", "configure the egress chain")
+	flag.StringVar(&ingressChain, "ingress", "", "configure the ingress chain")
 	flag.Parse()
 	if v, ok := env.CheckFlags(&cfg); !ok {
 		return v
@@ -239,45 +239,55 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 var mods = make(map[string]zoning.Module)
 
 func setupModules() {
-	// create modules
-	// core module
 	cm := zoning.NewCoreModule(cfg.Sig.IA, cfg.Sig.IP)
 	mods["core"] = cm
-	tm, err := transfer.New(cfg.Sig.IA, cfg.Sig.IP, cfg.TP.TransConf)
-	if err != nil {
-		panic(err)
-	}
+
+	fetcher := transfer.NewRuleFetcher(cfg.Sig.IA, cfg.Sig.IP, cfg.TP.TransConf)
+	tm := transfer.NewModule(fetcher, cfg.TP.TransConf)
+	transfer.Init()
+	tm.StartFetcher()
 	mods["trans"] = tm
+
 	keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf)
-	keyman.ServeL1()
 	transformer := auth.NewTR()
 	am := auth.NewModule(keyman, transformer, cfg.TP.AuthConf)
 	auth.Init()
+	keyman.ServeL1()
 	mods["auth"] = am
+
 	lm := &zoning.LogModule{LocalTP: fmt.Sprintf("%v,%v", cfg.Sig.IA, cfg.Sig.IP)}
 	mods["log"] = lm
 
 	// create ingress chain
 	s := strings.Split(ingressChain, ",")
-	fmt.Println("[ingress chain]")
-	for _, m := range s {
-		md, ok := mods[m]
-		if !ok {
-			continue
+	if len(s) == 0 {
+		fmt.Println("[inress chain]: {no modules}")
+	} else {
+		fmt.Println("[ingress chain]")
+		for _, m := range s {
+			md, ok := mods[m]
+			if !ok {
+				continue
+			}
+			zoning.EgressChain.Register(md)
+			fmt.Printf("%v, ", m)
 		}
-		zoning.IngressChain.Register(md)
-		fmt.Printf("	%v\n", m)
 	}
+	fmt.Println("")
 
 	// create egress chain
 	s = strings.Split(egressChain, ",")
-	fmt.Println("[egress chain]")
-	for _, m := range s {
-		md, ok := mods[m]
-		if !ok {
-			continue
+	if len(s) == 0 {
+		fmt.Println("[egress chain]: {no modules}")
+	} else {
+		fmt.Println("[egress chain]: ")
+		for _, m := range s {
+			md, ok := mods[m]
+			if !ok {
+				continue
+			}
+			zoning.EgressChain.Register(md)
+			fmt.Printf("%v, ", m)
 		}
-		zoning.EgressChain.Register(md)
-		fmt.Printf("	%v\n", m)
 	}
 }
