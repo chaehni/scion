@@ -86,24 +86,29 @@ type KeyMan struct {
 }
 
 // NewKeyMan creates a new Keyman
-func NewKeyMan(masterSecret []byte, listenIP net.IP, cfg tpconfig.AuthConf) *KeyMan {
-	ds := reliable.NewDispatcher("")
-	sciondConn, err := sciond.NewService(sciond.DefaultSCIONDAddress).Connect(context.Background())
-	if err != nil {
-		fmt.Println(err)
-	}
-	localIA, err := sciondConn.LocalIA(context.Background())
-	if err != nil {
-		fmt.Println(err)
-	}
-	pathQuerier := &sciond.Querier{Connector: sciondConn, IA: localIA}
-	network := snet.NewNetworkWithPR(localIA, ds, pathQuerier, sciond.RevHandler{Connector: sciondConn})
-	if err != nil {
-		fmt.Println(err)
-	}
-	err = squic.Init(cfg.Key, cfg.Cert)
-	if err != nil {
-		panic(err)
+func NewKeyMan(masterSecret []byte, listenIP net.IP, cfg tpconfig.AuthConf, test bool) *KeyMan {
+
+	var network *snet.SCIONNetwork
+	var pathQuerier *sciond.Querier
+	if !test {
+		ds := reliable.NewDispatcher("")
+		sciondConn, err := sciond.NewService(sciond.DefaultSCIONDAddress).Connect(context.Background())
+		if err != nil {
+			fmt.Println(err)
+		}
+		localIA, err := sciondConn.LocalIA(context.Background())
+		if err != nil {
+			fmt.Println(err)
+		}
+		pathQuerier = &sciond.Querier{Connector: sciondConn, IA: localIA}
+		network = snet.NewNetworkWithPR(localIA, ds, pathQuerier, sciond.RevHandler{Connector: sciondConn})
+		if err != nil {
+			fmt.Println(err)
+		}
+		err = squic.Init(cfg.Key, cfg.Cert)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return &KeyMan{
@@ -181,10 +186,6 @@ func (km *KeyMan) FetchL1Key(remote string) ([]byte, bool, error) {
 			return nil, false, err
 		}
 	}
-	/* 	x, ok := km.keyCache.Get(remote)
-	   	if !ok {
-	   		return nil, false, errors.New("fetching key failed") // Should never happen, we just fetched it
-	   	} */
 	l1 := x.([]byte)
 	key := make([]byte, km.keyLength)
 	copy(key, l1)

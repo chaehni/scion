@@ -80,7 +80,7 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	// check if claimed src IP is located behind the actual srcTP (as read from SCION header)
 	// (if srcTP was spoofed too, we wouldn't even get this far since the MAC verification would have failed in the auth module)
 	if srcTP != pkt.RemoteTP {
-		return zoning.NilPacket, fmt.Errorf("%v source TP %v is not responsible for claimed source %v", errorPrefix, pkt.RemoteTP, srcTP)
+		return zoning.NilPacket, fmt.Errorf("%v source TP %v is not responsible for claimed source %v", errorPrefix, pkt.RemoteTP, pkt.SrcHost)
 	}
 
 	// check if transfer is allowed

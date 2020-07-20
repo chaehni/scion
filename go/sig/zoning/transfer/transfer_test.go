@@ -7,11 +7,8 @@ import (
 	"testing"
 
 	"github.com/scionproto/scion/go/lib/fatal"
-
 	"github.com/scionproto/scion/go/sig/zoning"
-
 	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
-
 	"github.com/scionproto/scion/go/sig/zoning/transfer"
 	"github.com/scionproto/scion/go/sig/zoning/types"
 )

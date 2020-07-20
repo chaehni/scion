@@ -106,20 +106,6 @@ func BenchmarkDeriveL2FromCachedL1(b *testing.B) {
 	}
 }
 
-/* func BenchmarkSprintf(b *testing.B) {
-	sizes := []int{10, 100, 1000, 10000}
-	for _, size := range sizes {
-
-		b.ResetTimer()
-		b.Run(fmt.Sprintf("%d keys", size), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				num := mrand.Intn(size)
-				stringRes = fmt.Sprintf("%d-%x:%x:%x,127.0.0.1", num%99, num, num, num)
-			}
-		})
-	}
-} */
-
 func BenchmarkNewAEAD(b *testing.B) {
 	var key [16]byte
 

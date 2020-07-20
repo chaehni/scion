@@ -239,7 +239,7 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 var mods = make(map[string]zoning.Module)
 
 func setupModules() {
-	cm := zoning.NewCoreModule(cfg.Sig.IA, cfg.Sig.IP)
+	cm := zoning.NewCoreModule()
 	mods["core"] = cm
 
 	fetcher := transfer.NewRuleFetcher(cfg.Sig.IA, cfg.Sig.IP, cfg.TP.TransConf)
@@ -248,7 +248,7 @@ func setupModules() {
 	tm.StartFetcher()
 	mods["trans"] = tm
 
-	keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf)
+	keyman := auth.NewKeyMan([]byte("KEY"), cfg.Sig.IP, cfg.TP.AuthConf, false)
 	transformer := auth.NewTR()
 	am := auth.NewModule(keyman, transformer, cfg.TP.AuthConf)
 	auth.Init()
