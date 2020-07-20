@@ -17,7 +17,7 @@ import (
 )
 
 func BenchmarkHandleIngressSuccess(b *testing.B) {
-	size := 1000000
+	size := 100000
 	n, t := setupRules(size, 1)
 	fetcher := transfer.NewMockFetcher(n, t)
 	cfg := tpconfig.TransConf{}
@@ -29,9 +29,9 @@ func BenchmarkHandleIngressSuccess(b *testing.B) {
 
 	buf := [500]byte{}
 	srcIP := make(net.IP, 4)
-	binary.BigEndian.PutUint32(srcIP, uint32(1))
+	binary.BigEndian.PutUint32(srcIP, uint32(size-1))
 	destIP := make(net.IP, 4)
-	binary.BigEndian.PutUint32(destIP, uint32(1))
+	binary.BigEndian.PutUint32(destIP, uint32(size-1))
 	pkt := zoning.Packet{Ingress: false, SrcHost: srcIP, DstHost: destIP, RawPacket: buf[:], RemoteTP: "1-ff00:0:1,127.0.0.1"}
 
 	b.ResetTimer()
@@ -44,7 +44,7 @@ func BenchmarkHandleIngressSuccess(b *testing.B) {
 }
 
 func BenchmarkHandleIngressFail(b *testing.B) {
-	n, t := setupRules(1000000, 1)
+	n, t := setupRules(100000, 1)
 	fetcher := transfer.NewMockFetcher(n, t)
 	cfg := tpconfig.TransConf{}
 	cfg.InitDefaults()
@@ -66,16 +66,13 @@ func BenchmarkHandleIngressFail(b *testing.B) {
 }
 
 func setupRules(subs, trans int) (types.Subnets, types.Transfers) {
-
 	nets := types.Subnets{}
-
 	for i := 0; i < subs; i++ {
 		ip := make(net.IP, 4)
 		binary.BigEndian.PutUint32(ip, uint32(i))
 		nets = append(nets, &types.Subnet{IPNet: net.IPNet{IP: ip, Mask: net.IPv4Mask(255, 255, 255, 255)}, ZoneID: 1, TPAddr: "1-ff00:0:1,127.0.0.1"})
 
 	}
-
 	t := types.Transfers{
 		1: {1},
 	}

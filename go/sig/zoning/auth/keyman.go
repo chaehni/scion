@@ -14,18 +14,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
-
+	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/lib/snet/squic"
 	"github.com/scionproto/scion/go/lib/sock/reliable"
+	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
 
 	"github.com/lucas-clemente/quic-go"
 	"github.com/patrickmn/go-cache"
-	"github.com/scionproto/scion/go/lib/addr"
 	"golang.org/x/crypto/pbkdf2"
 )
 

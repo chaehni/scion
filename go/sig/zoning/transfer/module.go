@@ -179,32 +179,3 @@ func (m *Module) setInfo(nets types.Subnets, transfers types.Transfers) {
 	m.transfers = transfers
 
 }
-
-/* func (m *Module) fetchInfo() error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	// TODO: make an API package and read routes from there
-	resp, err := m.client.Post(fmt.Sprintf("https://%s/api/get-subnets", m.controllerAddr), "text/plain", strings.NewReader(m.localAddr))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&m.subnets)
-	if err != nil {
-		return err
-	}
-
-	resp, err = m.client.Post(fmt.Sprintf("https://%s/api/get-transfers", m.controllerAddr), "text/plain", strings.NewReader(m.localAddr))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	decoder = json.NewDecoder(resp.Body)
-	err = decoder.Decode(&m.transfers)
-	if err != nil {
-		return err
-	}
-	return nil
-} */
