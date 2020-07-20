@@ -271,12 +271,11 @@ func setupModules() {
 				log.Warn("unrecognized module", "module", m)
 				continue
 			}
-			zoning.EgressChain.Register(md)
+			zoning.IngressChain.Register(md)
 			modList = append(modList, m)
 		}
-		fmt.Printf("%v", strings.Join(modList, ","))
+		fmt.Printf("%v\n", strings.Join(modList, ","))
 	}
-	fmt.Println("")
 
 	// create egress chain
 	s = strings.Split(egressChain, ",")
@@ -294,6 +293,6 @@ func setupModules() {
 			zoning.EgressChain.Register(md)
 			modList = append(modList, m)
 		}
-		fmt.Printf("%v", strings.Join(modList, ","))
+		fmt.Printf("%v\n", strings.Join(modList, ","))
 	}
 }
