@@ -117,7 +117,7 @@ func realMain() int {
 		base.PollReqHdlr()
 	}()
 
-	/* Start of Zoning */
+	/* zZoning */
 	setupModules()
 
 	egress.Init(tunIO)
