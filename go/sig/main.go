@@ -261,33 +261,39 @@ func setupModules() {
 	// create ingress chain
 	s := strings.Split(ingressChain, ",")
 	if len(s) == 0 {
-		fmt.Println("[inress chain]: {no modules}")
+		fmt.Print("[inress chain]: {no modules}")
 	} else {
-		fmt.Println("[ingress chain]")
+		fmt.Print("[ingress chain]: ")
+		modList := []string{}
 		for _, m := range s {
 			md, ok := mods[m]
 			if !ok {
+				log.Warn("unrecognized module", "module", m)
 				continue
 			}
 			zoning.EgressChain.Register(md)
-			fmt.Printf("%v, ", m)
+			modList = append(modList, m)
 		}
+		fmt.Printf("%v", strings.Join(modList, ","))
 	}
 	fmt.Println("")
 
 	// create egress chain
 	s = strings.Split(egressChain, ",")
 	if len(s) == 0 {
-		fmt.Println("[egress chain]: {no modules}")
+		fmt.Print("[egress chain]: {no modules}")
 	} else {
-		fmt.Println("[egress chain]: ")
+		fmt.Print("[egress chain]: ")
+		modList := []string{}
 		for _, m := range s {
 			md, ok := mods[m]
 			if !ok {
+				log.Warn("unrecognized module", "module", m)
 				continue
 			}
 			zoning.EgressChain.Register(md)
-			fmt.Printf("%v, ", m)
+			modList = append(modList, m)
 		}
+		fmt.Printf("%v", strings.Join(modList, ","))
 	}
 }

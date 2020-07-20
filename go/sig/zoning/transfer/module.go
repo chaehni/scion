@@ -130,7 +130,6 @@ func (m *Module) findZone(ip net.IP) (types.ZoneID, string, error) {
 	if err != nil {
 		return 0, "", err
 	}
-	//return 0, "", fmt.Errorf("no matching zone found for IP %v", ip)
 	if len(res) != 1 {
 		return 0, "", fmt.Errorf("found %d subnets containing IP %v", len(res), ip)
 	}
