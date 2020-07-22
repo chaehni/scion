@@ -83,7 +83,7 @@ func BenchmarkFetchL1FromCache(b *testing.B) {
 }
 
 func BenchmarkDeriveL2FromCachedL1(b *testing.B) {
-	sizes := []int{10, 100, 1000, 10000}
+	sizes := []int{10, 100, 1000, 10000, 100000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("%d keys", size), func(b *testing.B) {
 			keyman := &KeyMan{keyCache: cache.New(time.Hour, -1), keyLength: 16}

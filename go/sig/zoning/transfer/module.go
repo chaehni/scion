@@ -2,7 +2,9 @@ package transfer
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -22,6 +24,7 @@ func Init() {
 	fatal.Check()
 }
 
+var dummyErr = errors.New("dummy")
 var errorPrefix = "[TransferModule]"
 
 var _ = zoning.Module(&Module{})
@@ -30,9 +33,10 @@ var _ = zoning.Module(&Module{})
 // It checks packets for valid zone transfers.
 type Module struct {
 	//subnets   types.Subnets
-	cfg       tpconfig.TransConf
-	ranger    cidranger.Ranger
-	transfers types.Transfers
+	cfg    tpconfig.TransConf
+	ranger cidranger.Ranger
+	//transfers types.Transfers
+	transfers map[types.ZoneID]map[types.ZoneID]struct{}
 	client    *http.Client
 
 	fetcher Fetcher
@@ -44,8 +48,9 @@ type Module struct {
 func NewModule(fetcher Fetcher, cfg tpconfig.TransConf) *Module {
 
 	return &Module{
-		cfg:    cfg,
-		ranger: cidranger.NewPCTrieRanger(),
+		cfg:       cfg,
+		ranger:    cidranger.NewPCTrieRanger(),
+		transfers: make(map[types.ZoneID]map[types.ZoneID]struct{}),
 		client: &http.Client{
 			Transport: shttp.NewRoundTripper(&tls.Config{InsecureSkipVerify: true}, nil),
 		},
@@ -70,11 +75,11 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	// get zones for src/dest
 	srcZone, srcTP, err := m.findZone(pkt.SrcHost)
 	if err != nil {
-		return zoning.NilPacket, fmt.Errorf("%v error finding source zone: %v", errorPrefix, err)
+		return zoning.NilPacket, dummyErr // fmt.Errorf("%v error finding source zone: %v", errorPrefix, err)
 	}
 	destZone, _, err := m.findZone(pkt.DstHost)
 	if err != nil {
-		return zoning.NilPacket, fmt.Errorf("%v error finding destination zone: %v", errorPrefix, err)
+		return zoning.NilPacket, dummyErr // fmt.Errorf("%v error finding destination zone: %v", errorPrefix, err)
 	}
 
 	// check if claimed src IP is located behind the actual srcTP (as read from SCION header)
@@ -84,16 +89,11 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	}
 
 	// check if transfer is allowed
-	dests, ok := m.transfers[srcZone]
-	if !ok {
-		return zoning.NilPacket, fmt.Errorf("%v no transfer rules found for source zone %v", errorPrefix, srcZone)
+	err = m.checkTransfer(srcZone, destZone)
+	if err != nil {
+		return zoning.NilPacket, dummyErr //fmt.Errorf("%v %v", errorPrefix, err)
 	}
-	for _, dest := range dests {
-		if destZone == dest {
-			return pkt, nil
-		}
-	}
-	return zoning.NilPacket, fmt.Errorf("%v transfer from zone %v to zone %v not allowed", errorPrefix, srcZone, destZone)
+	return pkt, nil
 }
 
 func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
@@ -103,26 +103,21 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	// get zones for src/dest
 	srcZone, _, err := m.findZone(pkt.SrcHost)
 	if err != nil {
-		return zoning.NilPacket, fmt.Errorf("%v error finding source zone: %v", errorPrefix, err)
+		return zoning.NilPacket, dummyErr // fmt.Errorf("%v error finding source zone: %v", errorPrefix, err)
 	}
 	destZone, dstTP, err := m.findZone(pkt.DstHost)
 	if err != nil {
-		return zoning.NilPacket, fmt.Errorf("%v error finding destination zone: %v", errorPrefix, err)
+		return zoning.NilPacket, dummyErr // fmt.Errorf("%v error finding destination zone: %v", errorPrefix, err)
 	}
 	pkt.RemoteTP = dstTP
 	pkt.DstZone = uint32(destZone)
 
 	// check if transfer is allowed
-	dests, ok := m.transfers[srcZone]
-	if !ok {
-		return zoning.NilPacket, fmt.Errorf("%v no transfer rules found for source zone %v", errorPrefix, srcZone)
+	err = m.checkTransfer(srcZone, destZone)
+	if err != nil {
+		return zoning.NilPacket, fmt.Errorf("%v %v", errorPrefix, err)
 	}
-	for _, dest := range dests {
-		if destZone == dest {
-			return pkt, nil
-		}
-	}
-	return zoning.NilPacket, fmt.Errorf("%v transfer from zone %v to zone %v not allowed", errorPrefix, srcZone, destZone)
+	return pkt, nil
 }
 
 func (m *Module) findZone(ip net.IP) (types.ZoneID, string, error) {
@@ -131,9 +126,24 @@ func (m *Module) findZone(ip net.IP) (types.ZoneID, string, error) {
 		return 0, "", err
 	}
 	if len(res) != 1 {
-		return 0, "", fmt.Errorf("found %d subnets containing IP %v", len(res), ip)
+		//return 0, "", fmt.Errorf("found %d subnets containing IP %v", len(res), ip)
+		return 0, "", dummyErr
 	}
-	return res[0].(*types.Subnet).ZoneID, res[0].(*types.Subnet).TPAddr, nil
+	subnet := res[0].(*types.Subnet)
+	return subnet.ZoneID, subnet.TPAddr, nil
+	//return 0, "", dummyErr
+}
+
+func (m *Module) checkTransfer(from, to types.ZoneID) error {
+	outer, ok := m.transfers[from]
+	if !ok {
+		return dummyErr //fmt.Errorf("%v no transfer rules found for source zone %v", errorPrefix, from)
+	}
+	_, ok = outer[to]
+	if !ok {
+		return dummyErr //fmt.Errorf("%v transfer from zone %v to zone %v not allowed", errorPrefix, from, to)
+	}
+	return nil
 }
 
 // StartFetcher starts the periodic fetcher assigned to the transfer module
@@ -143,7 +153,7 @@ func (m *Module) StartFetcher() {
 	var err error
 	subnets, err := m.fetcher.FetchSubnets()
 	if err != nil {
-		fatal.Fatal(fmt.Errorf("%v Failed to fetch initial subnets data from controller: %v", errorPrefix, err))
+		log.Fatal(fmt.Errorf("%v Failed to fetch initial subnets data from controller: %v", errorPrefix, err))
 	}
 	transfers, err := m.fetcher.FetchTransfers()
 	if err != nil {
@@ -175,6 +185,14 @@ func (m *Module) setInfo(nets types.Subnets, transfers types.Transfers) {
 	for _, net := range nets {
 		m.ranger.Insert(net)
 	}
-	m.transfers = transfers
+	for outer, slice := range transfers {
+		if m.transfers[outer] == nil {
+			m.transfers[outer] = make(map[types.ZoneID]struct{})
+		}
+		for _, inner := range slice {
+			m.transfers[outer][inner] = struct{}{}
+		}
+	}
+	//m.transfers = transfers
 
 }
