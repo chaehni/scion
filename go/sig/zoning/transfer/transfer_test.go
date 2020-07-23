@@ -107,7 +107,7 @@ func BenchmarkHandleIngressSecondIPNotFound(b *testing.B) {
 func BenchmarkTransferNotAllowed(b *testing.B) {
 	sizes := []int{100, 1000, 10000, 100000}
 	for _, s := range sizes {
-		b.Run(fmt.Sprintf("%v subnets", s), func(b *testing.B) {
+		b.Run(fmt.Sprintf("%v transfer rules", s), func(b *testing.B) {
 			n, t := setupRules(s, s-1)
 			fetcher := transfer.NewMockFetcher(n, t)
 			cfg := tpconfig.TransConf{}
