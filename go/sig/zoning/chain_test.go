@@ -1,6 +1,7 @@
 package zoning_test
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -27,19 +28,20 @@ var (
 
 func BenchmarkLocal(b *testing.B) {
 	sizes := []int{64, 128, 256, 512, 1024, 1512}
-	cfg := tpconfig.TPConf{}
-	cfg.InitDefaults()
-
-	cm := zoning.NewCoreModule()
-	subs, trans := setupRules(100000, 100000)
-	fetcher := transfer.NewMockFetcher(subs, trans)
-	tm := transfer.NewModule(fetcher, cfg.TransConf)
-	tm.StartFetcher()
-
-	chain := zoning.Chain{}
-	chain.Register(cm, tm)
 
 	for _, size := range sizes {
+		cfg := tpconfig.TPConf{}
+		cfg.InitDefaults()
+
+		cm := zoning.NewCoreModule()
+		subs, trans := setupRules(100000, 100000)
+		fetcher := transfer.NewMockFetcher(subs, trans)
+		tm := transfer.NewModule(fetcher, cfg.TransConf)
+		tm.StartFetcher()
+
+		chain := zoning.Chain{}
+		chain.Register(cm, tm)
+
 		b.Run(fmt.Sprintf("packet size %d", size), func(b *testing.B) {
 			raw := make([]byte, size)
 			raw[ipVerOffset] = byte(ip4Ver << 4)
@@ -76,8 +78,8 @@ func BenchmarkRemoteEgress(b *testing.B) {
 	tm := transfer.NewModule(fetcher, cfg.TransConf)
 	tm.StartFetcher()
 	km := auth.NewKeyMan([]byte("master_secret"), net.IP{}, cfg.AuthConf, true)
-	mock_km := auth.NewMockKeyMan(km)
-	am := auth.NewModule(mock_km, auth.NewTR(), cfg.AuthConf)
+	km.FillKeyStore(100000)
+	am := auth.NewModule(km, auth.NewTR(), cfg.AuthConf)
 
 	chain := zoning.Chain{}
 	chain.Register(cm, tm, am)
@@ -121,9 +123,9 @@ func BenchmarkRemoteIngress(b *testing.B) {
 			tm := transfer.NewModule(fetcher, cfg.TransConf)
 			tm.StartFetcher()
 			km := auth.NewKeyMan([]byte("master_secret"), net.IP{}, cfg.AuthConf, true)
-			mock_km := auth.NewMockKeyMan(km)
+			km.FillKeyStore(100)
 			tr := auth.NewTR()
-			am := auth.NewModule(mock_km, tr, cfg.AuthConf)
+			am := auth.NewModule(km, tr, cfg.AuthConf)
 
 			chain := zoning.Chain{}
 			chain.Register(am, cm, tm)
@@ -134,7 +136,7 @@ func BenchmarkRemoteIngress(b *testing.B) {
 			copy(raw[ip4DstOff:ip4DstOff+4], net.IPv4(0, 0, 0, 2).To4())
 
 			pkt := zoning.Packet{
-				RemoteTP:  "1-ff00:0:1,127.0.0.1",
+				RemoteTP:  "0-0:0:0,127.0.0.1",
 				RawPacket: raw,
 			}
 			pkt, err := am.Handle(pkt)
@@ -156,29 +158,28 @@ func BenchmarkRemoteIngress(b *testing.B) {
 			}
 		})
 	}
-
 }
 
-/* func setupRules(size int) (types.Subnets, types.Transfers) {
-	nets := types.Subnets{}
-	for i := 0; i < size; i++ {
-		ip := make(net.IP, 4)
-		binary.BigEndian.PutUint32(ip, uint32(i))
-		nets = append(nets, &types.Subnet{IPNet: net.IPNet{IP: ip, Mask: net.IPv4Mask(255, 255, 255, 255)}, ZoneID: 1, TPAddr: "1-ff00:0:1,127.0.0.1"})
-
+func BenchmarkCopy(b *testing.B) {
+	sizes := []int{64, 128, 256, 512, 1024, 1512}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("copy size %d", size), func(b *testing.B) {
+			srcBuf := make([]byte, size)
+			rand.Read(srcBuf)
+			dstBuf := make([]byte, size)
+			for i := 0; i < b.N; i++ {
+				copy(dstBuf, srcBuf)
+			}
+		})
 	}
-	t := types.Transfers{
-		1: {1},
-	}
-	return nets, t
-} */
+}
 
 func setupRules(subs, trans int) (types.Subnets, types.Transfers) {
 	nets := types.Subnets{}
 	for i := 0; i < subs; i++ {
 		ip := make(net.IP, 4)
 		binary.BigEndian.PutUint32(ip, uint32(i))
-		nets = append(nets, &types.Subnet{IPNet: net.IPNet{IP: ip, Mask: net.IPv4Mask(255, 255, 255, 255)}, ZoneID: types.ZoneID(subs) - 1, TPAddr: "1-ff00:0:1,127.0.0.1"})
+		nets = append(nets, &types.Subnet{IPNet: net.IPNet{IP: ip, Mask: net.IPv4Mask(255, 255, 255, 255)}, ZoneID: types.ZoneID(subs) - 1, TPAddr: "0-0:0:0,127.0.0.1"})
 
 	}
 	t := types.Transfers{
