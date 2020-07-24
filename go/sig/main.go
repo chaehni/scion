@@ -259,10 +259,10 @@ func setupModules() {
 	mods["log"] = lm
 
 	// create ingress chain
-	s := strings.Split(ingressChain, ",")
-	if len(s) == 0 {
-		fmt.Print("[inress chain]: {no modules}")
+	if len(ingressChain) == 0 {
+		fmt.Print("[inress chain]: {no modules}\n")
 	} else {
+		s := strings.Split(ingressChain, ",")
 		fmt.Print("[ingress chain]: ")
 		modList := []string{}
 		for _, m := range s {
@@ -278,10 +278,10 @@ func setupModules() {
 	}
 
 	// create egress chain
-	s = strings.Split(egressChain, ",")
-	if len(s) == 0 {
-		fmt.Print("[egress chain]: {no modules}")
+	if len(egressChain) == 0 {
+		fmt.Print("[egress chain]: {no modules}\n")
 	} else {
+		s := strings.Split(egressChain, ",")
 		fmt.Print("[egress chain]: ")
 		modList := []string{}
 		for _, m := range s {
