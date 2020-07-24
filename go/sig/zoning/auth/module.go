@@ -3,12 +3,13 @@ package auth
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/scionproto/scion/go/sig/zoning"
 	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
 )
+
+var dummyErr = errors.New("")
 
 var _ = zoning.Module(&Module{})
 
@@ -39,33 +40,32 @@ func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
 }
 
 func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
+	ts := time.Unix(int64(binary.LittleEndian.Uint32(pkt.RawPacket[timeOffset:timeOffset+timeLength])), 0)
+	err := m.checkTime(ts)
+	if err != nil {
+		return zoning.NilPacket, dummyErr // fmt.Errorf("[AuthIngress] verification failed: %v", err)
+	}
 	if pkt.RemoteTP == "" {
-		return zoning.NilPacket, fmt.Errorf("[AuthIngress] source TP address not set in packet")
+		return zoning.NilPacket, dummyErr // fmt.Errorf("[AuthIngress] source TP address not set in packet")
 	}
 	key, err := m.km.DeriveL2Key(pkt.RemoteTP, m.tr.GetZone(pkt.RawPacket))
 	if err != nil {
-		return zoning.NilPacket, fmt.Errorf("[AuthIngress] key derivation failed: %v", err)
+		return zoning.NilPacket, dummyErr // fmt.Errorf("[AuthIngress] key derivation failed: %v", err)
 	}
-	var ad []byte
-	ad, pkt.RawPacket, err = m.tr.FromIR(key, pkt.RawPacket)
+	_, pkt.RawPacket, err = m.tr.FromIR(key, pkt.RawPacket)
 	if err != nil {
-		return zoning.NilPacket, fmt.Errorf("[AuthIngress] verification failed: %v", err)
-	}
-	ts := time.Unix(int64(binary.LittleEndian.Uint32(ad[timeOffset:])), 0)
-	err = m.checkTime(ts)
-	if err != nil {
-		return zoning.NilPacket, fmt.Errorf("[AuthIngress] verification failed: %v", err)
+		return zoning.NilPacket, dummyErr // fmt.Errorf("[AuthIngress] verification failed: %v", err)
 	}
 	return pkt, nil
 }
 
 func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	if pkt.RemoteTP == "" {
-		return zoning.NilPacket, fmt.Errorf("[AuthEgress] destination TP address not set in packet")
+		return zoning.NilPacket, dummyErr // fmt.Errorf("[AuthEgress] destination TP address not set in packet")
 	}
 	key, fresh, err := m.km.FetchL2Key(pkt.RemoteTP, pkt.DstZone)
 	if err != nil {
-		return zoning.NilPacket, fmt.Errorf("[AuthEgress] fetching L1 key for %v failed: %v", pkt.RemoteTP, err)
+		return zoning.NilPacket, dummyErr // fmt.Errorf("[AuthEgress] fetching L1 key for %v failed: %v", pkt.RemoteTP, err)
 	}
 	if fresh {
 		m.tr.ResetState(pkt.RemoteTP)
@@ -76,7 +76,7 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	}
 	pkt.RawPacket, err = m.tr.ToIR(pkt.RemoteTP, key, pkt.RawPacket, pkt.DstZone)
 	if err != nil {
-		return zoning.NilPacket, fmt.Errorf("[AuthEgress] proof creation failed: %v", err)
+		return zoning.NilPacket, dummyErr // fmt.Errorf("[AuthEgress] proof creation failed: %v", err)
 	}
 	return pkt, nil
 }
@@ -84,7 +84,8 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 func (m *Module) checkTime(t time.Time) error {
 	diff := abs(t.Sub(time.Now().UTC()))
 	if diff > m.maxTimeDiff {
-		return errors.New("time difference is to big")
+		//return errors.New("time difference is to big")
+		return dummyErr
 	}
 	return nil
 

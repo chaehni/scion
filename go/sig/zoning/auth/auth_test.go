@@ -3,13 +3,18 @@ package auth
 import (
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"hash"
 	mrand "math/rand"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/patrickmn/go-cache"
+	"github.com/scionproto/scion/go/lib/util"
+	"github.com/scionproto/scion/go/sig/zoning"
+	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
 )
 
 var master = []byte("my_very_secure_master_secret")
@@ -148,6 +153,134 @@ func BenchmarkFromIR(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				copy(buf, cipher)
 				byteRes, _, _ = tr.FromIR(key[:], buf)
+			}
+		})
+	}
+}
+
+func BenchmarkFromIRWrongMAC(b *testing.B) {
+	sizes := []int{100, 500, 1000, 1500}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("packet size %d", size), func(b *testing.B) {
+			tr := NewTR()
+			var key [16]byte
+			packet := make([]byte, size)
+			rand.Read(packet)
+
+			b.SetBytes(int64(size))
+			b.ResetTimer()
+			var err error
+			for i := 0; i < b.N; i++ {
+				byteRes, _, err = tr.FromIR(key[:], packet)
+				if err == nil {
+					b.Fatal("expected auth error")
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkRemoteIngressExpiredTimestamp(b *testing.B) {
+	sizes := []int{64, 128, 256, 512, 1024, 1512}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("packet size %d", size), func(b *testing.B) {
+			cfg := tpconfig.TPConf{}
+			cfg.InitDefaults()
+			cfg.AuthConf.MaxTimeDiff = util.DurWrap{Duration: 24 * time.Hour}
+
+			km := NewKeyMan([]byte("master_secret"), net.IP{}, cfg.AuthConf, true)
+			km.FillKeyStore(1000)
+			tr := NewTR()
+			am := NewModule(km, tr, cfg.AuthConf)
+
+			pkt := zoning.Packet{
+				RemoteTP:  "0-0:0:0,127.0.0.1",
+				RawPacket: make([]byte, size+tr.Overhead()),
+				Ingress:   true,
+			}
+
+			// set invalid timestamp
+			binary.LittleEndian.PutUint32(pkt.RawPacket[timeOffset:timeOffset+timeLength], 0)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				am.Handle(pkt)
+				/* if err == nil {
+					b.Fatal("exptected timestamp error")
+				} */
+			}
+		})
+	}
+}
+
+func BenchmarkRemoteIngressInvalidMAC(b *testing.B) {
+	sizes := []int{64, 128, 256, 512, 1024, 1512}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("packet size %d", size), func(b *testing.B) {
+			cfg := tpconfig.TPConf{}
+			cfg.InitDefaults()
+			cfg.AuthConf.MaxTimeDiff = util.DurWrap{Duration: 24 * time.Hour}
+
+			km := NewKeyMan([]byte("master_secret"), net.IP{}, cfg.AuthConf, true)
+			km.FillKeyStore(100)
+			tr := NewTR()
+			am := NewModule(km, tr, cfg.AuthConf)
+
+			pkt := zoning.Packet{
+				RemoteTP:  "0-0:0:0,127.0.0.1",
+				RawPacket: make([]byte, size+tr.Overhead()),
+				Ingress:   true,
+			}
+
+			// set valid timestamp
+			binary.LittleEndian.PutUint32(pkt.RawPacket[timeOffset:timeOffset+timeLength], uint32(time.Now().Unix()))
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				//binary.LittleEndian.PutUint32(pkt.RawPacket[timeOffset:timeOffset+timeLength], uint32(time.Now().Unix()))
+				_, err := am.Handle(pkt)
+				if err == nil {
+					b.Fatal("expected invalid MAC error")
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkPutTimestamp(b *testing.B) {
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, uint32(time.Now().Unix()))
+	cfg := tpconfig.TPConf{}
+	cfg.InitDefaults()
+	cfg.AuthConf.MaxTimeDiff = util.DurWrap{Duration: 24 * time.Hour}
+
+	km := NewKeyMan([]byte("master_secret"), net.IP{}, cfg.AuthConf, true)
+	tr := NewTR()
+	am := NewModule(km, tr, cfg.AuthConf)
+	for i := 0; i < b.N; i++ {
+		ts := time.Unix(int64(binary.LittleEndian.Uint32(buf)), 0)
+		err := am.checkTime(ts)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkOpenEnc(b *testing.B) {
+	sizes := []int{64, 128, 256, 512, 1024, 1512}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("packet size %d", size), func(b *testing.B) {
+			pkt := make([]byte, size)
+			nonce := make([]byte, 12)
+			ad := make([]byte, 36)
+			aead, _ := newAEAD(make([]byte, 16))
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, err := aead.Open(pkt, nonce, pkt, ad)
+				if err == nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}
