@@ -128,7 +128,7 @@ func NewKeyMan(masterSecret []byte, listenIP net.IP, cfg tpconfig.AuthConf, test
 // FillKeyStore fills the key cache with dummy values used for testing
 func (km *KeyMan) FillKeyStore(n int) {
 	for i := 0; i < n; i++ {
-		remote := fmt.Sprintf("%d-%x:%x:%x,127.0.0.1", i%99, i%0xffff, i%0xf, i%0xf)
+		remote := fmt.Sprintf("%016x", i)
 		l1, _ := km.DeriveL1Key(remote)
 		km.keyCache.Set(remote, l1, 24*time.Hour)
 	}
