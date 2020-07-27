@@ -87,16 +87,17 @@ func BenchmarkFetchL1FromCache(b *testing.B) {
 }
 
 func BenchmarkDeriveL2FromCachedL1(b *testing.B) {
-	sizes := []int{10, 100, 1000, 10000, 100000}
+	sizes := []int{100, 1000, 10000, 100000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("%d keys", size), func(b *testing.B) {
-			keyman := &KeyMan{keyCache: cache.New(time.Hour, -1), keyLength: 16}
+			keyman := &KeyMan{keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
 			fillKeyStore(keyman.keyCache, size)
-			/* remotes := make([]string, size)
+			/* queries := make([]string, size)
 			for i := 0; i < size; i++ {
-				remotes[i] = fmt.Sprintf("%d-%x:%x:%x,127.0.0.1", i%99, i%0xffff, i%0xf, i%0xf)
-			} */
-
+				num := mrand.Intn(size)
+				queries[i] = fmt.Sprintf("%d-%x:%x:%x,127.0.0.1", num%99, num%0xffff, num%0xf, num%0xf)
+			}
+			un := queries[0] */
 			var err error
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {

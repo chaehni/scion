@@ -151,15 +151,14 @@ func (km *KeyMan) getL0Key() ([]byte, time.Time, error) {
 	}
 
 	km.l0Lock.RLock()
-	defer km.l0Lock.RUnlock()
 	k := make([]byte, km.keyLength)
 	copy(k, km.l0)
+	km.l0Lock.RUnlock()
 	return k, km.l0TTL, nil
 }
 
 func (km *KeyMan) refreshL0() error {
 	km.l0Lock.Lock()
-	defer km.l0Lock.Unlock()
 	// check again if key indeed is missing or expired in case multiple goroutines entered the function
 	if km.l0 != nil && km.l0TTL.After(time.Now()) {
 		return nil
@@ -176,6 +175,7 @@ func (km *KeyMan) refreshL0() error {
 	if err != nil {
 		return err
 	}
+	km.l0Lock.Unlock()
 	return nil
 }
 
@@ -296,8 +296,8 @@ func (km *KeyMan) deriveL1Key(remote string) ([]byte, time.Time, error) {
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	defer km.mac.Reset()
 	io.WriteString(km.mac, remote)
+	km.mac.Reset()
 	return km.mac.Sum(nil), t, nil
 }
 
