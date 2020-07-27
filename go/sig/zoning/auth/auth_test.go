@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash"
-	mrand "math/rand"
 	"net"
 	"testing"
 	"time"
@@ -19,7 +18,7 @@ import (
 
 var master = []byte("my_very_secure_master_secret")
 
-var remote = "1-ff00:0:0,127.0.0.1"
+var remote = "0-0:0:0,127.0.0.1"
 var byteRes []byte
 var stringRes string
 var hashRes hash.Hash
@@ -63,25 +62,25 @@ func BenchmarkDeriveL2KeyFromMaster(b *testing.B) {
 }
 
 func BenchmarkFetchL1FromCache(b *testing.B) {
-	sizes := []int{10, 100, 1000, 10000, 100000, 1000000, 10000000}
+	sizes := []int{100, 1000, 10000, 100000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("%d keys", size), func(b *testing.B) {
-			keyman := &KeyMan{keyCache: cache.New(time.Hour, -1), keyLength: 16}
+			keyman := &KeyMan{keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
 			fillKeyStore(keyman.keyCache, size)
-			remotes := make([]string, size)
+			/* queries := make([]string, size)
 			for i := 0; i < size; i++ {
-				remotes[i] = fmt.Sprintf("%d-%x:%x:%x,127.0.0.1", i%99, i%0xffff, i%0xf, i%0xf)
+				num := mrand.Intn(size)
+				queries[i] = fmt.Sprintf("%d-%x:%x:%x,127.0.0.1", num%99, num%0xffff, num%0xf, num%0xf)
 			}
-			//var err error
-			fillKeyStore(cache.New(cache.DefaultExpiration, -1), 100000)
+			un := queries[0] */
+			var err error
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				num := mrand.Intn(size)
-				byteRes, _, _ = keyman.FetchL1Key(remotes[num])
-				/* if err != nil {
+				byteRes, _, _ = keyman.FetchL1Key(remote)
+				if err != nil {
 					b.Fatal(err)
-				} */
+				}
 			}
 		})
 	}
@@ -93,19 +92,18 @@ func BenchmarkDeriveL2FromCachedL1(b *testing.B) {
 		b.Run(fmt.Sprintf("%d keys", size), func(b *testing.B) {
 			keyman := &KeyMan{keyCache: cache.New(time.Hour, -1), keyLength: 16}
 			fillKeyStore(keyman.keyCache, size)
-			remotes := make([]string, size)
+			/* remotes := make([]string, size)
 			for i := 0; i < size; i++ {
 				remotes[i] = fmt.Sprintf("%d-%x:%x:%x,127.0.0.1", i%99, i%0xffff, i%0xf, i%0xf)
-			}
-			//var err error
+			} */
 
+			var err error
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				num := mrand.Intn(size)
-				byteRes, _, _ = keyman.FetchL2Key(remotes[num], 0)
-				/* if err != nil {
+				byteRes, _, _ = keyman.FetchL2Key(remote, 0)
+				if err != nil {
 					b.Fatal(err)
-				} */
+				}
 			}
 		})
 	}
@@ -273,10 +271,10 @@ func BenchmarkOpenEnc(b *testing.B) {
 			pkt := make([]byte, size)
 			nonce := make([]byte, 12)
 			ad := make([]byte, 36)
-			aead, _ := newAEAD(make([]byte, 16))
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
+				aead, _ := newAEAD(make([]byte, 16))
 				_, err := aead.Open(pkt, nonce, pkt, ad)
 				if err == nil {
 					b.Fatal(err)
@@ -304,6 +302,6 @@ func fillKeyStore(cache *cache.Cache, n int) {
 	for i := 0; i < n; i++ {
 		buf := make([]byte, 16)
 		rand.Read(buf)
-		cache.Set(fmt.Sprintf("%d-%x:%x:%x,127.0.0.1", i%99, i%0xffff, i%0xf, i%0xf), buf, 0)
+		cache.Set(fmt.Sprintf("%d-%x:%x:%x,127.0.0.1", i%99, i%0xffff, i%0xf, i%0xf), buf, time.Hour)
 	}
 }
