@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
@@ -125,11 +126,25 @@ func NewKeyMan(masterSecret []byte, listenIP net.IP, cfg tpconfig.AuthConf, test
 	}
 }
 
-// FillKeyStore fills the key cache with dummy values used for testing
+// FillKeyStore fills the key cache with dummy remote TPs but real keys used for testing
 func (km *KeyMan) FillKeyStore(n int) error {
 	for i := 0; i < n; i++ {
 		remote := fmt.Sprintf("%016x", i)
 		l1, err := km.DeriveL1Key(remote)
+		if err != nil {
+			return err
+		}
+		km.keyCache.Set(remote, l1, 24*time.Hour)
+	}
+	return nil
+}
+
+// FillKeyStoreFakeKeys fills the key cache with dummy remote values and keys used for testing
+func (km *KeyMan) FillKeyStoreFakeKeys(n int) error {
+	for i := 0; i < n; i++ {
+		remote := fmt.Sprintf("%016x", i)
+		l1 := make([]byte, km.keyLength)
+		_, err := rand.Read(l1)
 		if err != nil {
 			return err
 		}

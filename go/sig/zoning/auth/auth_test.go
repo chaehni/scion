@@ -17,7 +17,6 @@ import (
 )
 
 var master = []byte("my_very_secure_master_secret")
-
 var remote = "0000000000000000"
 var byteRes []byte
 var stringRes string
@@ -28,45 +27,48 @@ var km = &KeyMan{ms: master, keyCache: cache.New(cache.NoExpiration, -1), keyLen
 
 func BenchmarkInitMac(b *testing.B) {
 	var key [16]byte
-
+	var err error
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		hashRes, _ = initMac(key[:])
+		hashRes, err = initMac(key[:])
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
 func BenchmarkDeriveL1KeyFromMaster(b *testing.B) {
 	keyman := &KeyMan{ms: master, keyLength: 16, keyTTL: 24 * time.Hour}
 	keyman.refreshL0()
-	//var err error
+	var err error
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		byteRes, _ = keyman.DeriveL1Key(remote)
-		/* if err != nil {
+		byteRes, err = keyman.DeriveL1Key(remote)
+		if err != nil {
 			b.Fatal(err)
-		} */
+		}
 	}
 }
 
 func BenchmarkDeriveL2KeyFromMaster(b *testing.B) {
 	keyman := &KeyMan{ms: master, keyLength: 16, keyTTL: 24 * time.Hour}
 	keyman.refreshL0()
-	//var err error
+	var err error
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		byteRes, _ = keyman.DeriveL2Key(remote, 50)
-		/* if err != nil {
+		byteRes, err = keyman.DeriveL2Key(remote, 50)
+		if err != nil {
 			b.Fatal(err)
-		} */
+		}
 	}
 }
 
 func BenchmarkFillKeyStore(b *testing.B) {
 	km := &KeyMan{ms: master, keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
 	for i := 0; i < b.N; i++ {
-		err := km.FillKeyStore(10)
+		err := km.FillKeyStore(10000)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -79,19 +81,13 @@ func BenchmarkFetchL1FromCache(b *testing.B) {
 		b.Run(fmt.Sprintf("%d keys", size), func(b *testing.B) {
 			var err error
 			keyman := &KeyMan{ms: master, keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
-			err = keyman.FillKeyStore(size)
+			err = keyman.FillKeyStoreFakeKeys(size)
 			if err != nil {
 				b.Fatal(err)
 			}
 			if keyman.keyCache.ItemCount() != size {
 				b.Fatal("wrong keystore size")
 			}
-			/* queries := make([]string, size)
-			for i := 0; i < size; i++ {
-				num := mrand.Intn(size)
-				queries[i] = fmt.Sprintf("%d-%x:%x:%x,127.0.0.1", num%99, num%0xffff, num%0xf, num%0xf)
-			}
-			un := queries[0] */
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -103,52 +99,17 @@ func BenchmarkFetchL1FromCache(b *testing.B) {
 		})
 	}
 }
-func Benchmark10000Keys(b *testing.B) {
-	keyman := &KeyMan{keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
-	keyman.FillKeyStore(10000)
-	if keyman.keyCache.ItemCount() != 10000 {
-		b.Fatal("wrong keystore size")
-	}
-	var err error
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		byteRes, _, err = keyman.FetchL2Key(remote, 0)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkSanityTest(b *testing.B) {
-	l1 := [16]byte{}
-	zone := uint32(0)
-	for i := 0; i < b.N; i++ {
-		mac, err := initMac(l1[:])
-		if err != nil {
-			b.Fatal(err)
-		}
-		buf := make([]byte, 4)
-		binary.LittleEndian.PutUint32(buf, zone)
-		mac.Write(buf[:3])
-		mac.Sum(nil)
-	}
-}
 
 func BenchmarkDeriveL2FromCachedL1(b *testing.B) {
 	sizes := []int{100, 1000, 10000, 100000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("%d keys", size), func(b *testing.B) {
 			keyman := &KeyMan{ms: master, keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
-			keyman.FillKeyStore(size)
+			keyman.FillKeyStoreFakeKeys(size)
 			if keyman.keyCache.ItemCount() != size {
 				b.Fatal("wrong keystore size")
 			}
-			/* queries := make([]string, size)
-			for i := 0; i < size; i++ {
-				num := mrand.Intn(size)
-				queries[i] = fmt.Sprintf("%d-%x:%x:%x,127.0.0.1", num%99, num%0xffff, num%0xf, num%0xf)
-			}
-			un := queries[0] */
+
 			var err error
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -163,10 +124,14 @@ func BenchmarkDeriveL2FromCachedL1(b *testing.B) {
 
 func BenchmarkNewAEAD(b *testing.B) {
 	var key [16]byte
+	var err error
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		aeadRes, _ = newAEAD(key[:])
+		aeadRes, err = newAEAD(key[:])
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 func BenchmarkToIR(b *testing.B) {
@@ -175,13 +140,17 @@ func BenchmarkToIR(b *testing.B) {
 		b.Run(fmt.Sprintf("packet size %d", size), func(b *testing.B) {
 			tr := NewTR()
 			var key [16]byte
+			var err error
 			packet := make([]byte, size)
 			rand.Read(packet)
 
 			b.SetBytes(int64(size))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				byteRes, _ = tr.ToIR(remote, key[:], packet, 0)
+				byteRes, err = tr.ToIR(remote, key[:], packet, 0)
+				if err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}
@@ -193,6 +162,7 @@ func BenchmarkFromIR(b *testing.B) {
 		b.Run(fmt.Sprintf("packet size %d", size), func(b *testing.B) {
 			tr := NewTR()
 			var key [16]byte
+			var err error
 			packet := make([]byte, size)
 			rand.Read(packet)
 			cipher, _ := tr.ToIR(remote, key[:], packet[:], 0)
@@ -202,7 +172,10 @@ func BenchmarkFromIR(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				copy(buf, cipher)
-				byteRes, _, _ = tr.FromIR(key[:], buf)
+				byteRes, _, err = tr.FromIR(key[:], buf)
+				if err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}
@@ -234,12 +207,16 @@ func BenchmarkRemoteIngressExpiredTimestamp(b *testing.B) {
 	sizes := []int{64, 128, 256, 512, 1024, 1512}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("packet size %d", size), func(b *testing.B) {
+			var err error
 			cfg := tpconfig.TPConf{}
 			cfg.InitDefaults()
 			cfg.AuthConf.MaxTimeDiff = util.DurWrap{Duration: 24 * time.Hour}
 
 			km := NewKeyMan([]byte("master_secret"), net.IP{}, cfg.AuthConf, true)
-			km.FillKeyStore(1000)
+			err = km.FillKeyStore(1000)
+			if err != nil {
+				b.Fatal(err)
+			}
 			if km.keyCache.ItemCount() != 1000 {
 				b.Fatal("wrong keystore size")
 			}
@@ -247,7 +224,7 @@ func BenchmarkRemoteIngressExpiredTimestamp(b *testing.B) {
 			am := NewModule(km, tr, cfg.AuthConf)
 
 			pkt := zoning.Packet{
-				RemoteTP:  "0-0:0:0,127.0.0.1",
+				RemoteTP:  remote,
 				RawPacket: make([]byte, size+tr.Overhead()),
 				Ingress:   true,
 			}
@@ -257,10 +234,10 @@ func BenchmarkRemoteIngressExpiredTimestamp(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				am.Handle(pkt)
-				/* if err == nil {
+				_, err = am.Handle(pkt)
+				if err == nil {
 					b.Fatal("exptected timestamp error")
-				} */
+				}
 			}
 		})
 	}
@@ -270,12 +247,16 @@ func BenchmarkRemoteIngressInvalidMAC(b *testing.B) {
 	sizes := []int{64, 128, 256, 512, 1024, 1512}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("packet size %d", size), func(b *testing.B) {
+			var err error
 			cfg := tpconfig.TPConf{}
 			cfg.InitDefaults()
 			cfg.AuthConf.MaxTimeDiff = util.DurWrap{Duration: 24 * time.Hour}
 
 			km := NewKeyMan([]byte("master_secret"), net.IP{}, cfg.AuthConf, true)
-			km.FillKeyStore(1000)
+			err = km.FillKeyStore(1000)
+			if err != nil {
+				b.Fatal(err)
+			}
 			if km.keyCache.ItemCount() != 1000 {
 				b.Fatal("wrong keystore size")
 			}
@@ -283,7 +264,7 @@ func BenchmarkRemoteIngressInvalidMAC(b *testing.B) {
 			am := NewModule(km, tr, cfg.AuthConf)
 
 			pkt := zoning.Packet{
-				RemoteTP:  "0-0:0:0,127.0.0.1",
+				RemoteTP:  remote,
 				RawPacket: make([]byte, size+tr.Overhead()),
 				Ingress:   true,
 			}
@@ -319,40 +300,6 @@ func BenchmarkPutTimestamp(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-	}
-}
-
-func BenchmarkOpenEnc(b *testing.B) {
-	sizes := []int{64, 128, 256, 512, 1024, 1512}
-	for _, size := range sizes {
-		b.Run(fmt.Sprintf("packet size %d", size), func(b *testing.B) {
-			pkt := make([]byte, size)
-			nonce := make([]byte, 12)
-			ad := make([]byte, 36)
-
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				aead, _ := newAEAD(make([]byte, 16))
-				_, err := aead.Open(pkt, nonce, pkt, ad)
-				if err == nil {
-					b.Fatal(err)
-				}
-			}
-		})
-	}
-}
-
-func BenchmarkCopy(b *testing.B) {
-	sizes := []int{100, 500, 1000, 1500}
-	for _, size := range sizes {
-		b.Run(fmt.Sprintf("copy size %d", size), func(b *testing.B) {
-			srcBuf := make([]byte, size)
-			rand.Read(srcBuf)
-			dstBuf := make([]byte, size)
-			for i := 0; i < b.N; i++ {
-				copy(dstBuf, srcBuf)
-			}
-		})
 	}
 }
 
