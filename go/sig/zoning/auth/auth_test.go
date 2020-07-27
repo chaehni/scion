@@ -85,6 +85,18 @@ func BenchmarkFetchL1FromCache(b *testing.B) {
 		})
 	}
 }
+func Benchmark1000Keys(b *testing.B) {
+	keyman := &KeyMan{keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
+	fillKeyStore(keyman.keyCache, 10000)
+	var err error
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		byteRes, _, _ = keyman.FetchL2Key(remote, 0)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
 
 func BenchmarkDeriveL2FromCachedL1(b *testing.B) {
 	sizes := []int{100, 1000, 10000, 100000}

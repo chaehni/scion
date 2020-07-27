@@ -297,8 +297,9 @@ func (km *KeyMan) deriveL1Key(remote string) ([]byte, time.Time, error) {
 		return nil, time.Time{}, err
 	}
 	io.WriteString(km.mac, remote)
+	sum := km.mac.Sum(nil)
 	km.mac.Reset()
-	return km.mac.Sum(nil), t, nil
+	return sum, t, nil
 }
 
 // DeriveL2Key derives the Level-2 key used to verify incoming traffic
