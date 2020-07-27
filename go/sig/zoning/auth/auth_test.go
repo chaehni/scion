@@ -65,16 +65,6 @@ func BenchmarkDeriveL2KeyFromMaster(b *testing.B) {
 	}
 }
 
-func BenchmarkFillKeyStore(b *testing.B) {
-	km := &KeyMan{ms: master, keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
-	for i := 0; i < b.N; i++ {
-		err := km.FillKeyStore(10000)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
 func BenchmarkFetchL1FromCache(b *testing.B) {
 	sizes := []int{100, 1000, 10000, 100000}
 	for _, size := range sizes {
@@ -114,6 +104,29 @@ func BenchmarkDeriveL2FromCachedL1(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				byteRes, _, err = keyman.FetchL2Key(remote, 0)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkDeriveL2FromGivenL1(b *testing.B) {
+	sizes := []int{100, 1000, 10000, 100000}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("%d keys", size), func(b *testing.B) {
+			keyman := &KeyMan{ms: master, keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
+			keyman.FillKeyStoreFakeKeys(size)
+			if keyman.keyCache.ItemCount() != size {
+				b.Fatal("wrong keystore size")
+			}
+			key := [16]byte{}
+
+			var err error
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				byteRes, err = keyman.DeriveL2ForGivenL1(key[:], remote, 0)
 				if err != nil {
 					b.Fatal(err)
 				}

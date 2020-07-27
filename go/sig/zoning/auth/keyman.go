@@ -236,6 +236,17 @@ func (km *KeyMan) FetchL2Key(remote string, zone uint32) ([]byte, bool, error) {
 	return mac.Sum(nil), fresh, nil
 }
 
+func (km *KeyMan) DeriveL2ForGivenL1(l1 []byte, remote string, zone uint32) ([]byte, error) {
+	mac, err := initMac(l1)
+	if err != nil {
+		return nil, err
+	}
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, zone)
+	mac.Write(buf[:3])
+	return mac.Sum(nil), nil
+}
+
 func (km *KeyMan) fetchL1FromRemote(remote string) ([]byte, bool, error) {
 	//TODO: this lock is bad because it serializes all requests, not just the ones going to the same destination
 	km.reqLock.Lock()
