@@ -126,12 +126,16 @@ func NewKeyMan(masterSecret []byte, listenIP net.IP, cfg tpconfig.AuthConf, test
 }
 
 // FillKeyStore fills the key cache with dummy values used for testing
-func (km *KeyMan) FillKeyStore(n int) {
+func (km *KeyMan) FillKeyStore(n int) error {
 	for i := 0; i < n; i++ {
 		remote := fmt.Sprintf("%016x", i)
-		l1, _ := km.DeriveL1Key(remote)
+		l1, err := km.DeriveL1Key(remote)
+		if err != nil {
+			return err
+		}
 		km.keyCache.Set(remote, l1, 24*time.Hour)
 	}
+	return nil
 }
 
 // UpdateMS updates the key manager's master secret

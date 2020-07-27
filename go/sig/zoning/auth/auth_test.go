@@ -18,11 +18,13 @@ import (
 
 var master = []byte("my_very_secure_master_secret")
 
-var remote = "0-0:0:0,127.0.0.1"
+var remote = "0000000000000000"
 var byteRes []byte
 var stringRes string
 var hashRes hash.Hash
 var aeadRes cipher.AEAD
+
+var km = &KeyMan{ms: master, keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
 
 func BenchmarkInitMac(b *testing.B) {
 	var key [16]byte
@@ -61,12 +63,26 @@ func BenchmarkDeriveL2KeyFromMaster(b *testing.B) {
 	}
 }
 
+func BenchmarkFillKeyStore(b *testing.B) {
+	km := &KeyMan{ms: master, keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
+	for i := 0; i < b.N; i++ {
+		err := km.FillKeyStore(10)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkFetchL1FromCache(b *testing.B) {
 	sizes := []int{100, 1000, 10000, 100000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("%d keys", size), func(b *testing.B) {
-			keyman := &KeyMan{keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
-			keyman.FillKeyStore(size)
+			var err error
+			keyman := &KeyMan{ms: master, keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
+			err = keyman.FillKeyStore(size)
+			if err != nil {
+				b.Fatal(err)
+			}
 			if keyman.keyCache.ItemCount() != size {
 				b.Fatal("wrong keystore size")
 			}
@@ -76,7 +92,6 @@ func BenchmarkFetchL1FromCache(b *testing.B) {
 				queries[i] = fmt.Sprintf("%d-%x:%x:%x,127.0.0.1", num%99, num%0xffff, num%0xf, num%0xf)
 			}
 			un := queries[0] */
-			var err error
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -123,7 +138,7 @@ func BenchmarkDeriveL2FromCachedL1(b *testing.B) {
 	sizes := []int{100, 1000, 10000, 100000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("%d keys", size), func(b *testing.B) {
-			keyman := &KeyMan{keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
+			keyman := &KeyMan{ms: master, keyCache: cache.New(cache.NoExpiration, -1), keyLength: 16}
 			keyman.FillKeyStore(size)
 			if keyman.keyCache.ItemCount() != size {
 				b.Fatal("wrong keystore size")
