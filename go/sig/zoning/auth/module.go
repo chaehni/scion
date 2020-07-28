@@ -10,6 +10,8 @@ import (
 )
 
 var dummyErr = errors.New("")
+var egressPrefix = "[AuthEgress]"
+var ingressPrefix = "[AuthIngress]"
 
 var _ = zoning.Module(&Module{})
 
@@ -48,7 +50,11 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	if pkt.RemoteTP == "" {
 		return zoning.NilPacket, dummyErr // fmt.Errorf("[AuthIngress] source TP address not set in packet")
 	}
-	key, err := m.km.DeriveL2Key(pkt.RemoteTP, m.tr.GetZone(pkt.RawPacket))
+	zone, err := m.tr.GetZone(pkt.RawPacket)
+	if err != nil {
+		return zoning.NilPacket, dummyErr // fmt.Errorf("%s %v", ingressPrefix, err)
+	}
+	key, err := m.km.DeriveL2Key(pkt.RemoteTP, zone)
 	if err != nil {
 		return zoning.NilPacket, dummyErr // fmt.Errorf("[AuthIngress] key derivation failed: %v", err)
 	}

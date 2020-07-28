@@ -1,7 +1,6 @@
 package zoning_test
 
 import (
-	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -136,7 +135,7 @@ func BenchmarkRemoteIngress(b *testing.B) {
 			copy(raw[ip4DstOff:ip4DstOff+4], net.IPv4(0, 0, 0, 2).To4())
 
 			pkt := zoning.Packet{
-				RemoteTP:  "0-0:0:0,127.0.0.1",
+				RemoteTP:  "0000000000000001",
 				RawPacket: raw,
 			}
 			pkt, err := am.Handle(pkt)
@@ -160,26 +159,12 @@ func BenchmarkRemoteIngress(b *testing.B) {
 	}
 }
 
-func BenchmarkCopy(b *testing.B) {
-	sizes := []int{64, 128, 256, 512, 1024, 1512}
-	for _, size := range sizes {
-		b.Run(fmt.Sprintf("copy size %d", size), func(b *testing.B) {
-			srcBuf := make([]byte, size)
-			rand.Read(srcBuf)
-			dstBuf := make([]byte, size)
-			for i := 0; i < b.N; i++ {
-				copy(dstBuf, srcBuf)
-			}
-		})
-	}
-}
-
 func setupRules(subs, trans int) (types.Subnets, types.Transfers) {
 	nets := types.Subnets{}
 	for i := 0; i < subs; i++ {
 		ip := make(net.IP, 4)
 		binary.BigEndian.PutUint32(ip, uint32(i))
-		nets = append(nets, &types.Subnet{IPNet: net.IPNet{IP: ip, Mask: net.IPv4Mask(255, 255, 255, 255)}, ZoneID: types.ZoneID(subs) - 1, TPAddr: "0-0:0:0,127.0.0.1"})
+		nets = append(nets, &types.Subnet{IPNet: net.IPNet{IP: ip, Mask: net.IPv4Mask(255, 255, 255, 255)}, ZoneID: types.ZoneID(subs) - 1, TPAddr: fmt.Sprintf("%016x", i)})
 
 	}
 	t := types.Transfers{

@@ -2,27 +2,33 @@
 // This representation consist of the authenticated proof
 // and the encrypted and authenticated IP packet.
 
-//   0        1        2        3        4        5        6        7
-//   +--------+--------+--------+--------+--------+--------+--------+--------+
-//   |  Nonce    |
-//   +--------+--------+--------+--------+--------+--------+--------+--------+
-//   |  Type  |          Zone ID         |            Time Stamp             |
-//   +--------+--------+--------+--------+--------+--------+--------+--------+
-//   |                                  MAC                                  |
-//   +--------+--------+--------+--------+--------+--------+--------+--------+
-//   |                           MAC (continued)                             |
-//   +--------+--------+--------+--------+--------+--------+--------+--------+
-//   |                          IP packet (encrypted)                        |
-//   +--------+--------+--------+--------+--------+--------+--------+--------+
-//   |                                  ...                                  |
-//   +--------+--------+--------+--------+--------+--------+--------+--------+
+//   0        1        2        3        4
+//   +--------+--------+--------+--------+
+//   |  Type  |          ZoneID          |
+//   +--------+--------+--------+--------+
+//   |             TimeStamp             |
+//   +--------+--------+--------+--------+
+//   |               Nonce               |
+//   +--------+--------+--------+--------+
+//   |           Nonce (continued)       |
+//   +--------+--------+--------+--------+
+//   |           Nonce (continued)       |
+//   +--------+--------+--------+--------+
+//   |                MAC                |
+//   +--------+--------+--------+--------+
+//   |          MAC (continued)          |
+//   +--------+--------+--------+--------+
+//   |          MAC (continued)          |
+//   +--------+--------+--------+--------+
+//   |          MAC (continued)          |
+//   +--------+--------+--------+--------+
 
 package auth
 
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"errors"
+	"fmt"
 	"io"
 	"math"
 	"sync/atomic"
@@ -86,7 +92,7 @@ func (ns *nonceState) nextNonce(buf []byte) error {
 		old := ns.nonceCtr
 		new := old + 1
 		if old == ns.maxNonceCtr {
-			return errors.New("nonce reached max count, new key required")
+			return dummyErr //errors.New("nonce reached max count, new key required")
 		}
 		if atomic.CompareAndSwapUint64(&ns.nonceCtr, old, new) {
 			bs := make([]byte, 8)
@@ -108,7 +114,7 @@ func NewTR() *TR {
 // Overhead is the number of additional bytes added to the original IP
 // packet when transformed to intermediate representation.
 func (t *TR) Overhead() int {
-	return nonceSize() + tagSize() + headerLength
+	return headerLength + nonceSize() + tagSize()
 }
 
 // ResetState resets the state for remote kept by the Transformer
@@ -171,8 +177,11 @@ func (t *TR) buildHeader(zone uint32) []byte {
 // FromIR transforms data back to an IP packet
 func (t *TR) FromIR(key, message []byte) (additionalData []byte, packet []byte, err error) {
 	nonceSize := nonceSize()
-	//TODO: check message size before slicing
-	additionalData, nonce, cipher := message[:headerLength], message[headerLength:nonceSize+headerLength], message[nonceSize+headerLength:]
+	if len(packet) <= t.Overhead() {
+		return nil, nil, fmt.Errorf("packet too small, need more than %d bytes", t.Overhead())
+	}
+	additionalData, nonce, cipher := message[:headerLength],
+		message[headerLength:nonceSize+headerLength], message[nonceSize+headerLength:]
 	aead, err := newAEAD(key)
 	if err != nil {
 		return nil, nil, err
@@ -185,9 +194,11 @@ func (t *TR) FromIR(key, message []byte) (additionalData []byte, packet []byte, 
 }
 
 // GetZone extracts the zone infromation from the encrypted packet
-func (t *TR) GetZone(message []byte) uint32 {
-	//TODO: check message size before slicing
+func (t *TR) GetZone(message []byte) (uint32, error) {
+	if len(message) < zoneOffset+zoneLength {
+		return 0, fmt.Errorf("cannot retrieve zone ID. message too short")
+	}
 	zone := uint32(message[zoneOffset]) | uint32(message[zoneOffset+1])<<8 |
 		uint32(message[zoneOffset+2])<<16
-	return zone
+	return zone, nil
 }

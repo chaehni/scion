@@ -19,5 +19,5 @@ type Transformer interface {
 	ToIR(remote string, key, packet []byte, dstZone uint32) ([]byte, error)
 	FromIR(key, cipher []byte) (additionalData []byte, packet []byte, err error)
 	ResetState(remote string) error
-	GetZone(message []byte) uint32
+	GetZone(message []byte) (uint32, error)
 }

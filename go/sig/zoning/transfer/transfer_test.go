@@ -7,7 +7,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/sig/zoning"
 	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
 	"github.com/scionproto/scion/go/sig/zoning/transfer"
@@ -23,8 +22,6 @@ func BenchmarkHandleIngressSuccess(b *testing.B) {
 			cfg := tpconfig.TransConf{}
 			cfg.InitDefaults()
 			module := transfer.NewModule(fetcher, cfg)
-			fatal.Init()
-			transfer.Init()
 			module.StartFetcher()
 
 			buf := [500]byte{}
@@ -55,8 +52,6 @@ func BenchmarkHandleIngressFirstIPNotFound(b *testing.B) {
 			cfg := tpconfig.TransConf{}
 			cfg.InitDefaults()
 			module := transfer.NewModule(fetcher, cfg)
-			fatal.Init()
-			transfer.Init()
 			module.StartFetcher()
 
 			buf := [500]byte{}
@@ -84,8 +79,6 @@ func BenchmarkHandleIngressSecondIPNotFound(b *testing.B) {
 			cfg := tpconfig.TransConf{}
 			cfg.InitDefaults()
 			module := transfer.NewModule(fetcher, cfg)
-			fatal.Init()
-			transfer.Init()
 			module.StartFetcher()
 
 			buf := [500]byte{}
@@ -113,15 +106,13 @@ func BenchmarkTransferNotAllowed(b *testing.B) {
 			cfg := tpconfig.TransConf{}
 			cfg.InitDefaults()
 			module := transfer.NewModule(fetcher, cfg)
-			fatal.Init()
-			transfer.Init()
 			module.StartFetcher()
 
 			buf := [500]byte{}
 			srcIP := make(net.IP, 4)
 			binary.BigEndian.PutUint32(srcIP, uint32(s-1))
 			destIP := make(net.IP, 4)
-			binary.BigEndian.PutUint32(destIP, uint32(s-1))
+			binary.BigEndian.PutUint32(destIP, uint32(s-2))
 			pkt := zoning.Packet{Ingress: true, SrcHost: srcIP, DstHost: destIP, RawPacket: buf[:], RemoteTP: "1-ff00:0:1,127.0.0.1"}
 
 			b.ResetTimer()

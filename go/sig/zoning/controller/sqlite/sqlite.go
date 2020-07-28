@@ -8,8 +8,11 @@ import (
 	"net"
 
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/sig/zoning/types"
 )
+
+var maxZoneID = 1<<24 - 1
 
 // Backend wraps the database backend
 type Backend struct {
@@ -113,8 +116,8 @@ func (b *Backend) Exec(stmt string) (sql.Result, error) {
 // InsertZone inserts a Zone into the Backend
 func (b *Backend) InsertZone(zoneID int, name string) error {
 	// check zoneID is not too big
-	if zoneID > 1<<24-1 {
-		return errors.New("ZoneID too big, must fit into 24 bits")
+	if zoneID > maxZoneID {
+		return fmt.Errorf("zone ID must be at most %d", maxZoneID)
 	}
 	stmt := `INSERT INTO Zones (id, name) VALUES (?, ?)`
 	_, err := b.db.Exec(stmt, zoneID, name)
@@ -126,9 +129,12 @@ func (b *Backend) InsertZone(zoneID int, name string) error {
 
 // InsertSite inserts a branch site into the Backend
 func (b *Backend) InsertSite(tpAddr string, name string) error {
-	// TODO: check if tpAddr is a valid address (parse udpaddr)
+	_, err := snet.ParseUDPAddr(tpAddr)
+	if err != nil {
+		return fmt.Errorf("%s is not a valid address", tpAddr)
+	}
 	stmt := `INSERT INTO Sites (tp_address, name) VALUES (?, ?)`
-	_, err := b.db.Exec(stmt, tpAddr, name)
+	_, err = b.db.Exec(stmt, tpAddr, name)
 	if err != nil {
 		return err
 	}
@@ -137,9 +143,15 @@ func (b *Backend) InsertSite(tpAddr string, name string) error {
 
 // InsertSubnet inserts a Subnet into the Backend
 func (b *Backend) InsertSubnet(zoneID int, net net.IPNet, tpAddr string) error {
-	// TODO: check if tpAddr is a valid address (parse udpaddr)
+	if zoneID > maxZoneID {
+		return fmt.Errorf("zone ID must be at most %d", maxZoneID)
+	}
+	_, err := snet.ParseUDPAddr(tpAddr)
+	if err != nil {
+		return fmt.Errorf("%s is not a valid address", tpAddr)
+	}
 	stmt := `INSERT INTO Subnets (zone, net_ip, net_mask, tp_address) VALUES (?, ?, ?, ?)`
-	_, err := b.db.Exec(stmt, zoneID, net.IP, net.Mask, tpAddr)
+	_, err = b.db.Exec(stmt, zoneID, net.IP, net.Mask, tpAddr)
 	if err != nil {
 		return err
 	}
