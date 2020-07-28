@@ -5,9 +5,10 @@
 package mock_metrics
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 	time "time"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockExportMetric is a mock of ExportMetric interface

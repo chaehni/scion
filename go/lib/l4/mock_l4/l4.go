@@ -5,10 +5,11 @@
 package mock_l4
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	common "github.com/scionproto/scion/go/lib/common"
 	l4 "github.com/scionproto/scion/go/lib/l4"
-	reflect "reflect"
 )
 
 // MockL4Header is a mock of L4Header interface

@@ -6,6 +6,9 @@ package mock_infra
 
 import (
 	context "context"
+	net "net"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	addr "github.com/scionproto/scion/go/lib/addr"
 	common "github.com/scionproto/scion/go/lib/common"
@@ -17,8 +20,6 @@ import (
 	seg "github.com/scionproto/scion/go/lib/ctrl/seg"
 	infra "github.com/scionproto/scion/go/lib/infra"
 	proto "github.com/scionproto/scion/go/proto"
-	net "net"
-	reflect "reflect"
 )
 
 // MockASInspector is a mock of ASInspector interface

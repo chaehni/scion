@@ -5,12 +5,13 @@
 package mock_conn
 
 import (
-	gomock "github.com/golang/mock/gomock"
-	common "github.com/scionproto/scion/go/lib/common"
-	conn "github.com/scionproto/scion/go/lib/overlay/conn"
 	net "net"
 	reflect "reflect"
 	time "time"
+
+	gomock "github.com/golang/mock/gomock"
+	common "github.com/scionproto/scion/go/lib/common"
+	conn "github.com/scionproto/scion/go/lib/overlay/conn"
 )
 
 // MockConn is a mock of Conn interface

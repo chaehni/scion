@@ -6,10 +6,11 @@ package mock_revcache
 
 import (
 	context "context"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	path_mgmt "github.com/scionproto/scion/go/lib/ctrl/path_mgmt"
 	revcache "github.com/scionproto/scion/go/lib/revcache"
-	reflect "reflect"
 )
 
 // MockRevCache is a mock of RevCache interface

@@ -5,9 +5,10 @@
 package mock_fetcher
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	pathpol "github.com/scionproto/scion/go/lib/pathpol"
-	reflect "reflect"
 )
 
 // MockPolicy is a mock of Policy interface

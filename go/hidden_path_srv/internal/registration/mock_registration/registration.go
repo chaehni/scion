@@ -5,10 +5,11 @@
 package mock_registration
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	addr "github.com/scionproto/scion/go/lib/addr"
 	path_mgmt "github.com/scionproto/scion/go/lib/ctrl/path_mgmt"
-	reflect "reflect"
 )
 
 // MockValidator is a mock of Validator interface

@@ -6,12 +6,13 @@ package mock_messenger
 
 import (
 	context "context"
+	net "net"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	addr "github.com/scionproto/scion/go/lib/addr"
 	snet "github.com/scionproto/scion/go/lib/snet"
 	svc "github.com/scionproto/scion/go/lib/svc"
-	net "net"
-	reflect "reflect"
 )
 
 // MockLocalSVCRouter is a mock of LocalSVCRouter interface

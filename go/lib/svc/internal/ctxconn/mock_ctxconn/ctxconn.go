@@ -5,9 +5,10 @@
 package mock_ctxconn
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 	time "time"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockDeadlineCloser is a mock of DeadlineCloser interface

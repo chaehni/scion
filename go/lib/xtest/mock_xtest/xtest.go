@@ -5,8 +5,9 @@
 package mock_xtest
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockCallback is a mock of Callback interface

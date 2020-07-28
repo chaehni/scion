@@ -6,10 +6,11 @@ package mock_reliable
 
 import (
 	context "context"
-	gomock "github.com/golang/mock/gomock"
-	addr "github.com/scionproto/scion/go/lib/addr"
 	net "net"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
+	addr "github.com/scionproto/scion/go/lib/addr"
 )
 
 // MockDispatcher is a mock of Dispatcher interface

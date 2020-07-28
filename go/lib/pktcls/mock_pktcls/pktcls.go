@@ -5,8 +5,9 @@
 package mock_pktcls
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockCond is a mock of Cond interface

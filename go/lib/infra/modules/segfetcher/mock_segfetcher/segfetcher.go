@@ -6,12 +6,13 @@ package mock_segfetcher
 
 import (
 	context "context"
+	net "net"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	path_mgmt "github.com/scionproto/scion/go/lib/ctrl/path_mgmt"
 	segfetcher "github.com/scionproto/scion/go/lib/infra/modules/segfetcher"
 	seghandler "github.com/scionproto/scion/go/lib/infra/modules/seghandler"
-	net "net"
-	reflect "reflect"
 )
 
 // MockDstProvider is a mock of DstProvider interface

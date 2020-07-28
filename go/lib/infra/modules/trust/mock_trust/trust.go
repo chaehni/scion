@@ -7,6 +7,9 @@ package mock_trust
 import (
 	context "context"
 	sql "database/sql"
+	net "net"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	addr "github.com/scionproto/scion/go/lib/addr"
 	infra "github.com/scionproto/scion/go/lib/infra"
@@ -15,8 +18,6 @@ import (
 	keyconf "github.com/scionproto/scion/go/lib/keyconf"
 	scrypto "github.com/scionproto/scion/go/lib/scrypto"
 	trc "github.com/scionproto/scion/go/lib/scrypto/trc"
-	net "net"
-	reflect "reflect"
 )
 
 // MockCryptoProvider is a mock of CryptoProvider interface

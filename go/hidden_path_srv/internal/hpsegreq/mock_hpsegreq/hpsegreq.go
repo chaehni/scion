@@ -6,10 +6,11 @@ package mock_hpsegreq
 
 import (
 	context "context"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	path_mgmt "github.com/scionproto/scion/go/lib/ctrl/path_mgmt"
 	snet "github.com/scionproto/scion/go/lib/snet"
-	reflect "reflect"
 )
 
 // MockFetcher is a mock of Fetcher interface

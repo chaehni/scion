@@ -6,6 +6,8 @@ package mock_pathmgr
 
 import (
 	context "context"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	addr "github.com/scionproto/scion/go/lib/addr"
 	common "github.com/scionproto/scion/go/lib/common"
@@ -14,7 +16,6 @@ import (
 	pathpol "github.com/scionproto/scion/go/lib/pathpol"
 	sciond "github.com/scionproto/scion/go/lib/sciond"
 	spathmeta "github.com/scionproto/scion/go/lib/spath/spathmeta"
-	reflect "reflect"
 )
 
 // MockPolicy is a mock of Policy interface

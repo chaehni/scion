@@ -6,12 +6,13 @@ package mock_seghandler
 
 import (
 	context "context"
+	net "net"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	path_mgmt "github.com/scionproto/scion/go/lib/ctrl/path_mgmt"
 	seghandler "github.com/scionproto/scion/go/lib/infra/modules/seghandler"
 	segverifier "github.com/scionproto/scion/go/lib/infra/modules/segverifier"
-	net "net"
-	reflect "reflect"
 )
 
 // MockStorage is a mock of Storage interface

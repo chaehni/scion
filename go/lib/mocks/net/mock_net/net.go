@@ -5,10 +5,11 @@
 package mock_net
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	net "net"
 	reflect "reflect"
 	time "time"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockAddr is a mock of Addr interface

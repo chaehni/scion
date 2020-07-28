@@ -5,10 +5,11 @@
 package mock_log
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	log15 "github.com/inconshreveable/log15"
 	log "github.com/scionproto/scion/go/lib/log"
-	reflect "reflect"
 )
 
 // MockHandler is a mock of Handler interface

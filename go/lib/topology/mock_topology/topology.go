@@ -5,14 +5,15 @@
 package mock_topology
 
 import (
+	net "net"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	addr "github.com/scionproto/scion/go/lib/addr"
 	common "github.com/scionproto/scion/go/lib/common"
 	snet "github.com/scionproto/scion/go/lib/snet"
 	topology "github.com/scionproto/scion/go/lib/topology"
 	proto "github.com/scionproto/scion/go/proto"
-	net "net"
-	reflect "reflect"
 )
 
 // MockTopology is a mock of Topology interface

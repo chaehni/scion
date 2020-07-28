@@ -6,11 +6,12 @@ package mock_svc
 
 import (
 	context "context"
+	net "net"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	snet "github.com/scionproto/scion/go/lib/snet"
 	svc "github.com/scionproto/scion/go/lib/svc"
-	net "net"
-	reflect "reflect"
 )
 
 // MockRequestHandler is a mock of RequestHandler interface

@@ -7,13 +7,14 @@ package mock_pathdb
 import (
 	context "context"
 	sql "database/sql"
+	reflect "reflect"
+	time "time"
+
 	gomock "github.com/golang/mock/gomock"
 	addr "github.com/scionproto/scion/go/lib/addr"
 	seg "github.com/scionproto/scion/go/lib/ctrl/seg"
 	pathdb "github.com/scionproto/scion/go/lib/pathdb"
 	query "github.com/scionproto/scion/go/lib/pathdb/query"
-	reflect "reflect"
-	time "time"
 )
 
 // MockPathDB is a mock of PathDB interface

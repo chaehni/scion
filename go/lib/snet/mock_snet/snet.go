@@ -6,13 +6,14 @@ package mock_snet
 
 import (
 	context "context"
+	net "net"
+	reflect "reflect"
+	time "time"
+
 	gomock "github.com/golang/mock/gomock"
 	addr "github.com/scionproto/scion/go/lib/addr"
 	snet "github.com/scionproto/scion/go/lib/snet"
 	spath "github.com/scionproto/scion/go/lib/spath"
-	net "net"
-	reflect "reflect"
-	time "time"
 )
 
 // MockConn is a mock of Conn interface
