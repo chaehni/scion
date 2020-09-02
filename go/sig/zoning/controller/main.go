@@ -35,6 +35,14 @@ func main() {
 
 	/*** API used by admin frontend ***/
 	//TODO: iplement frontend
+	http.HandleFunc("/", handler.IndexHandler)
+	http.HandleFunc("/api/get-all-subnets", apiChain(handler.GetAllSubnetsHandler))
+	http.HandleFunc("/api/get-all-transfers", apiChain(handler.GetAllTransfersHandler))
+	http.HandleFunc("/api/insert-transfers", apiChain(handler.InsertTransfersHandler))
+
+	go func() {
+		log.Fatal(http.ListenAndServe(":4433", nil))
+	}()
 
 	log.Fatal(shttp.ListenAndServe(":8080", nil))
 }

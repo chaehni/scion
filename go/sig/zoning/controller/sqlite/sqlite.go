@@ -159,7 +159,7 @@ func (b *Backend) InsertSubnet(zoneID int, net net.IPNet, tpAddr string) error {
 }
 
 // InsertTransfers inserts premitted zone transfers into the Backend
-func (b *Backend) InsertTransfers(transfers map[int][]int) error {
+func (b *Backend) InsertTransfers(transfers types.Transfers) error {
 	stmt := `INSERT INTO Transfers (src, dest) VALUES (?, ?)`
 
 	// do insertion in a transaction to ensure atomicity
@@ -238,6 +238,32 @@ func (b *Backend) DeleteTransfers(transfers map[int][]int) error {
 
 /* Getters */
 
+// GetAllSubnets returns all subnets stored in the backend
+func (b *Backend) GetAllSubnets() ([]*types.Subnet, error) {
+
+	stmt := `SELECT net_ip, net_mask, zone, tp_address 
+	FROM   subnets`
+
+	rows, err := b.db.Query(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	var nets []*types.Subnet
+	var ip []byte
+	var mask []byte
+	var zone types.ZoneID
+	var tp string
+	for rows.Next() {
+		err = rows.Scan(&ip, &mask, &zone, &tp)
+		if err != nil {
+			return nil, err
+		}
+		nets = append(nets, &types.Subnet{IPNet: net.IPNet{IP: ip, Mask: mask}, ZoneID: zone, TPAddr: tp})
+	}
+	return nets, nil
+}
+
 // GetSubnets returns all subnets stored in the backend relevant for ZTP with address tpAddr
 func (b *Backend) GetSubnets(tpAddr string) ([]*types.Subnet, error) {
 	stmt := `WITH tp_zones
@@ -277,7 +303,35 @@ func (b *Backend) GetSubnets(tpAddr string) ([]*types.Subnet, error) {
 	return nets, nil
 }
 
-// GetTransfers returns all allowed transfers stored in the backend
+// GetAllTransfers returns all allowed dtransfers stored in the backend
+func (b *Backend) GetAllTransfers() (map[int][]int, error) {
+	stmt := `SELECT src, dest 
+	FROM   transfers`
+
+	rows, err := b.db.Query(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	transfers := make(map[int][]int)
+	var src int
+	var dest int
+	for rows.Next() {
+		err = rows.Scan(&src, &dest)
+		if err != nil {
+			return nil, err
+		}
+		dests, ok := transfers[src]
+		if !ok {
+			transfers[src] = []int{dest}
+			continue
+		}
+		transfers[src] = append(dests, dest)
+	}
+	return transfers, nil
+}
+
+// GetTransfers returns all allowed transfers of a given TP stored in the backend
 func (b *Backend) GetTransfers(tpAddr string) (map[int][]int, error) {
 	stmt := `WITH relevant_zones 
 	AS (SELECT DISTINCT zone 

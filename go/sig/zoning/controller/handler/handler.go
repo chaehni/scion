@@ -11,6 +11,7 @@ import (
 	"net/http/httputil"
 
 	"github.com/scionproto/scion/go/sig/zoning/controller/sqlite"
+	"github.com/scionproto/scion/go/sig/zoning/types"
 )
 
 var db *sqlite.Backend
@@ -20,7 +21,12 @@ func init() {
 	db = setupDB()
 }
 
-// GetSubnetsHandler returns all subnet information to the client
+// IndexHandler handles the default route
+func IndexHandler(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, "Hello from the Controller")
+}
+
+// GetSubnetsHandler returns the subnet information for a given TP to the client
 func GetSubnetsHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: the shttp package is very basic and does not allow to set the local address
 	// therefore the handler sees the default ISD-AS,127.0.0.1 address as remote. The public IP of the TP is therfore sent
@@ -35,11 +41,63 @@ func GetSubnetsHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, err.Error())
+		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "    ") //TODO: remove after testing
 	enc.Encode(nets)
+}
+
+// GetAllSubnetsHandler returns all subnet information to the client
+func GetAllSubnetsHandler(w http.ResponseWriter, r *http.Request) {
+	nets, err := db.GetAllSubnets()
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "    ") //TODO: remove after testing
+	enc.Encode(nets)
+}
+
+// InsertTransfersHandler inserts the given transfers into the backend
+func InsertTransfersHandler(w http.ResponseWriter, r *http.Request) {
+	// decode body into transfers
+	var transfers types.Transfers
+	err := json.NewDecoder(r.Body).Decode(&transfers)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	err = db.InsertTransfers(transfers)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// GetAllTransfersHandler returns all transfer information to the client
+func GetAllTransfersHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: the shttp package is very basic and does not allow to set the local address
+	// therefore the handler sees the default ISD-AS,127.0.0.1 address as remote. The public IP of the TP is therfore sent
+	// in the body. This should be checked to match the certificate
+	transfers, err := db.GetAllTransfers()
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "    ") //TODO: remove after testing
+	enc.Encode(transfers)
 }
 
 // GetTransfersHandler returns all transfer information to the client
@@ -57,6 +115,7 @@ func GetTransfersHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, err.Error())
+		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	enc := json.NewEncoder(w)
@@ -132,7 +191,7 @@ func setupDB() *sqlite.Backend {
 		panic(err)
 	}
 
-	t := map[int][]int{
+	t := types.Transfers{
 		1:   {1, 345},
 		345: {345, 1},
 		456: {2, 3, 4, 5},
