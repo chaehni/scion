@@ -28,6 +28,7 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -92,7 +93,7 @@ func (ns *nonceState) nextNonce(buf []byte) error {
 		old := ns.nonceCtr
 		new := old + 1
 		if old == ns.maxNonceCtr {
-			return dummyErr //errors.New("nonce reached max count, new key required")
+			return errors.New("nonce reached max count, new key required")
 		}
 		if atomic.CompareAndSwapUint64(&ns.nonceCtr, old, new) {
 			bs := make([]byte, 8)
