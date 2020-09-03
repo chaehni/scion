@@ -17,13 +17,14 @@ type LogModule struct {
 func (m *LogModule) Handle(pkt Packet) (Packet, error) {
 	p := gopacket.NewPacket(pkt.RawPacket, layers.LayerTypeIPv4, gopacket.Default)
 	l4 := p.ApplicationLayer()
-	if l4 != nil {
+	lErr := p.ErrorLayer()
+	if lErr == nil && l4 != nil {
 		if pkt.Ingress {
 			fmt.Printf("[ingress log] %v ---> %v ====> %v ---> %v\n%v\n", pkt.SrcHost, pkt.RemoteTP, m.LocalTP, pkt.DstHost, string(l4.Payload()))
 		} else {
 			fmt.Printf("[egress log] %v ---> %v ====> %v ---> %v\n%v\n", pkt.SrcHost, m.LocalTP, pkt.RemoteTP, pkt.DstHost, string(l4.Payload()))
 		}
-	} else {
+	} else if lErr != nil {
 		if pkt.Ingress {
 			fmt.Printf("[ingress log] %v ---> %v ====> %v ---> %v\n%v\n", "?", pkt.RemoteTP, m.LocalTP, "?", pkt.RawPacket)
 		} else {
