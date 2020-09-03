@@ -2,7 +2,6 @@ package transfer
 
 import (
 	"crypto/tls"
-	"errors"
 
 	"fmt"
 	"log"
@@ -25,7 +24,7 @@ func Init() {
 	fatal.Check()
 }
 
-var dummyErr = errors.New("dummy")
+//var dummyErr = errors.New("dummy")
 var errorPrefix = "[TransferModule]"
 
 var _ = zoning.Module(&Module{})
@@ -76,23 +75,23 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	// get zones for src/dest
 	srcZone, srcTP, err := m.findZone(pkt.SrcHost)
 	if err != nil {
-		return zoning.NilPacket, dummyErr // fmt.Errorf("%v error finding source zone: %v", errorPrefix, err)
+		return zoning.NilPacket, fmt.Errorf("%v error finding source zone: %v", errorPrefix, err)
 	}
 	destZone, _, err := m.findZone(pkt.DstHost)
 	if err != nil {
-		return zoning.NilPacket, dummyErr // fmt.Errorf("%v error finding destination zone: %v", errorPrefix, err)
+		return zoning.NilPacket, fmt.Errorf("%v error finding destination zone: %v", errorPrefix, err)
 	}
 
 	// check if claimed src IP is located behind the actual srcTP (as read from SCION header)
 	// (if srcTP was spoofed too, we wouldn't even get this far since the MAC verification would have failed in the auth module)
 	if srcTP != pkt.RemoteTP {
-		return zoning.NilPacket, dummyErr //fmt.Errorf("%v source TP %v is not responsible for claimed source %v", errorPrefix, pkt.RemoteTP, pkt.SrcHost)
+		return zoning.NilPacket, fmt.Errorf("%v source TP %v is not responsible for claimed source %v", errorPrefix, pkt.RemoteTP, pkt.SrcHost)
 	}
 
 	// check if transfer is allowed
 	err = m.checkTransfer(srcZone, destZone)
 	if err != nil {
-		return zoning.NilPacket, dummyErr //fmt.Errorf("%v %v", errorPrefix, err)
+		return zoning.NilPacket, fmt.Errorf("%v %v", errorPrefix, err)
 	}
 	return pkt, nil
 }
@@ -104,11 +103,11 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	// get zones for src/dest
 	srcZone, _, err := m.findZone(pkt.SrcHost)
 	if err != nil {
-		return zoning.NilPacket, dummyErr // fmt.Errorf("%v error finding source zone: %v", errorPrefix, err)
+		return zoning.NilPacket, fmt.Errorf("%v error finding source zone: %v", errorPrefix, err)
 	}
 	destZone, dstTP, err := m.findZone(pkt.DstHost)
 	if err != nil {
-		return zoning.NilPacket, dummyErr // fmt.Errorf("%v error finding destination zone: %v", errorPrefix, err)
+		return zoning.NilPacket, fmt.Errorf("%v error finding destination zone: %v", errorPrefix, err)
 	}
 	pkt.RemoteTP = dstTP
 	pkt.DstZone = uint32(destZone)
@@ -116,7 +115,7 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	// check if transfer is allowed
 	err = m.checkTransfer(srcZone, destZone)
 	if err != nil {
-		return zoning.NilPacket, dummyErr // fmt.Errorf("%v %v", errorPrefix, err)
+		return zoning.NilPacket, fmt.Errorf("%v %v", errorPrefix, err)
 	}
 	return pkt, nil
 }
@@ -127,8 +126,7 @@ func (m *Module) findZone(ip net.IP) (types.ZoneID, string, error) {
 		return 0, "", err
 	}
 	if len(res) != 1 {
-		//return 0, "", fmt.Errorf("found %d subnets containing IP %v", len(res), ip)
-		return 0, "", dummyErr
+		return 0, "", fmt.Errorf("found %d subnets containing IP %v", len(res), ip)
 	}
 	subnet := res[0].(*types.Subnet)
 	return subnet.ZoneID, subnet.TPAddr, nil
@@ -138,11 +136,11 @@ func (m *Module) findZone(ip net.IP) (types.ZoneID, string, error) {
 func (m *Module) checkTransfer(from, to types.ZoneID) error {
 	outer, ok := m.transfers[from]
 	if !ok {
-		return dummyErr //fmt.Errorf("%v no transfer rules found for source zone %v", errorPrefix, from)
+		return fmt.Errorf("%v no transfer rules found for source zone %v", errorPrefix, from)
 	}
 	_, ok = outer[to]
 	if !ok {
-		return dummyErr //fmt.Errorf("%v transfer from zone %v to zone %v not allowed", errorPrefix, from, to)
+		return fmt.Errorf("%v transfer from zone %v to zone %v not allowed", errorPrefix, from, to)
 	}
 	return nil
 }
