@@ -41,7 +41,7 @@ func main() {
 	http.HandleFunc("/api/insert-transfers", apiChain(handler.InsertTransfersHandler))
 
 	go func() {
-		log.Fatal(http.ListenAndServe(":4433", nil))
+		log.Fatal(http.ListenAndServeTLS("192.168.1.11:4433", "cert.pem", "key.pem", nil))
 	}()
 
 	log.Fatal(shttp.ListenAndServe(":8080", nil))
