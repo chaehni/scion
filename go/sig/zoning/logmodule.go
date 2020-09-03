@@ -23,6 +23,12 @@ func (m *LogModule) Handle(pkt Packet) (Packet, error) {
 		} else {
 			fmt.Printf("[egress log] %v ---> %v ====> %v ---> %v\n%v\n", pkt.SrcHost, m.LocalTP, pkt.RemoteTP, pkt.DstHost, string(l4.Payload()))
 		}
+	} else {
+		if pkt.Ingress {
+			fmt.Printf("[ingress log] %v ---> %v ====> %v ---> %v\n%v\n", "?", pkt.RemoteTP, m.LocalTP, "?", pkt.RawPacket)
+		} else {
+			fmt.Printf("[egress log] %v ---> %v ====> %v ---> %v\n%v\n", "?", pkt.RemoteTP, m.LocalTP, "?", pkt.RawPacket)
+		}
 	}
 	return pkt, nil
 }
