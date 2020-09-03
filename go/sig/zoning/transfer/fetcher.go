@@ -1,14 +1,12 @@
 package transfer
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"strings"
 
-	"github.com/netsec-ethz/scion-apps/pkg/shttp"
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
 	"github.com/scionproto/scion/go/sig/zoning/types"
@@ -38,8 +36,8 @@ func NewRuleFetcher(ia addr.IA, ip net.IP, cfg tpconfig.TransConf) *RuleFetcher 
 	return &RuleFetcher{
 		localAddr:      fmt.Sprintf("%v,%v", ia, ip),
 		controllerAddr: cfg.ControllerAddr,
-		client: &http.Client{
-			Transport: shttp.NewRoundTripper(&tls.Config{InsecureSkipVerify: true}, nil),
+		client:         &http.Client{
+			//Transport: shttp.NewRoundTripper(&tls.Config{InsecureSkipVerify: true}, nil),
 		},
 	}
 }
