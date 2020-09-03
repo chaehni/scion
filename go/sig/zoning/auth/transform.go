@@ -178,7 +178,7 @@ func (t *TR) buildHeader(zone uint32) []byte {
 // FromIR transforms data back to an IP packet
 func (t *TR) FromIR(key, message []byte) (additionalData []byte, packet []byte, err error) {
 	nonceSize := nonceSize()
-	if len(packet) <= t.Overhead() {
+	if len(message) <= t.Overhead() {
 		return nil, nil, fmt.Errorf("packet too small, need more than %d bytes", t.Overhead())
 	}
 	additionalData, nonce, cipher := message[:headerLength],
