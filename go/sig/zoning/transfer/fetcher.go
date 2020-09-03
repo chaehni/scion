@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -36,7 +37,10 @@ func NewRuleFetcher(ia addr.IA, ip net.IP, cfg tpconfig.TransConf) *RuleFetcher 
 	return &RuleFetcher{
 		localAddr:      fmt.Sprintf("%v,%v", ia, ip),
 		controllerAddr: cfg.ControllerAddr,
-		client:         &http.Client{
+		client: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
 			//Transport: shttp.NewRoundTripper(&tls.Config{InsecureSkipVerify: true}, nil),
 		},
 	}
