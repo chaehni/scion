@@ -8,12 +8,12 @@ import (
 )
 
 // LogModule implements a module which logs traffic it handles.
-// It checks packets for valid zone transfers.
+// It checks packets for valid zone transitions.
 type LogModule struct {
 	LocalTP string
 }
 
-// Handle checks packets for valid zone transfers
+// Handle checks packets for valid zone transitions
 func (m *LogModule) Handle(pkt Packet) (Packet, error) {
 	p := gopacket.NewPacket(pkt.RawPacket, layers.LayerTypeIPv4, gopacket.Default)
 	l4 := p.ApplicationLayer()

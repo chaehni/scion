@@ -11,7 +11,7 @@ import (
 // TPConf contains the configuration specific to the zone translation point.
 type TPConf struct {
 	AuthConf  AuthConf  `toml:"auth_module,omitempty"`
-	TransConf TransConf `toml:"transfer_module,omitempty"`
+	TransConf TransConf `toml:"transition_module,omitempty"`
 }
 
 // InitDefaults sets the default values to unset values.
@@ -65,7 +65,7 @@ func (cfg *AuthConf) InitDefaults() {
 	}
 }
 
-// TransConf configures the transfer module
+// TransConf configures the transition module
 type TransConf struct {
 	// the interval at which fresh information is pulled from the controller
 	RefrehInterval util.DurWrap `toml:"refresh_interval,omitempty"`

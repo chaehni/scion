@@ -1,4 +1,4 @@
-package transfer_test
+package transition_test
 
 import (
 	"encoding/binary"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/scionproto/scion/go/sig/zoning"
 	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
-	"github.com/scionproto/scion/go/sig/zoning/transfer"
+	"github.com/scionproto/scion/go/sig/zoning/transition"
 	"github.com/scionproto/scion/go/sig/zoning/types"
 )
 
@@ -18,10 +18,10 @@ func BenchmarkHandleIngressSuccess(b *testing.B) {
 	for _, s := range sizes {
 		b.Run(fmt.Sprintf("%v subnets", s), func(b *testing.B) {
 			n, t := setupRules(s, s)
-			fetcher := transfer.NewMockFetcher(n, t)
+			fetcher := transition.NewMockFetcher(n, t)
 			cfg := tpconfig.TransConf{}
 			cfg.InitDefaults()
-			module := transfer.NewModule(fetcher, cfg)
+			module := transition.NewModule(fetcher, cfg)
 			module.StartFetcher()
 
 			buf := [500]byte{}
@@ -48,10 +48,10 @@ func BenchmarkHandleIngressFirstIPNotFound(b *testing.B) {
 	for _, s := range sizes {
 		b.Run(fmt.Sprintf("%v subnets", s), func(b *testing.B) {
 			n, t := setupRules(s, s)
-			fetcher := transfer.NewMockFetcher(n, t)
+			fetcher := transition.NewMockFetcher(n, t)
 			cfg := tpconfig.TransConf{}
 			cfg.InitDefaults()
-			module := transfer.NewModule(fetcher, cfg)
+			module := transition.NewModule(fetcher, cfg)
 			module.StartFetcher()
 
 			buf := [500]byte{}
@@ -75,10 +75,10 @@ func BenchmarkHandleIngressSecondIPNotFound(b *testing.B) {
 	for _, s := range sizes {
 		b.Run(fmt.Sprintf("%v subnets", s), func(b *testing.B) {
 			n, t := setupRules(s, 1)
-			fetcher := transfer.NewMockFetcher(n, t)
+			fetcher := transition.NewMockFetcher(n, t)
 			cfg := tpconfig.TransConf{}
 			cfg.InitDefaults()
-			module := transfer.NewModule(fetcher, cfg)
+			module := transition.NewModule(fetcher, cfg)
 			module.StartFetcher()
 
 			buf := [500]byte{}
@@ -100,12 +100,12 @@ func BenchmarkHandleIngressSecondIPNotFound(b *testing.B) {
 func BenchmarkTransferNotAllowed(b *testing.B) {
 	sizes := []int{100, 1000, 10000, 100000}
 	for _, s := range sizes {
-		b.Run(fmt.Sprintf("%v transfer rules", s), func(b *testing.B) {
+		b.Run(fmt.Sprintf("%v transition rules", s), func(b *testing.B) {
 			n, t := setupRules(s, s-1)
-			fetcher := transfer.NewMockFetcher(n, t)
+			fetcher := transition.NewMockFetcher(n, t)
 			cfg := tpconfig.TransConf{}
 			cfg.InitDefaults()
-			module := transfer.NewModule(fetcher, cfg)
+			module := transition.NewModule(fetcher, cfg)
 			module.StartFetcher()
 
 			buf := [500]byte{}
@@ -127,7 +127,7 @@ func BenchmarkTransferNotAllowed(b *testing.B) {
 	}
 }
 
-func setupRules(subs, trans int) (types.Subnets, types.Transfers) {
+func setupRules(subs, trans int) (types.Subnets, types.Transitions) {
 	nets := types.Subnets{}
 	for i := 0; i < subs; i++ {
 		ip := make(net.IP, 4)
@@ -135,7 +135,7 @@ func setupRules(subs, trans int) (types.Subnets, types.Transfers) {
 		nets = append(nets, &types.Subnet{IPNet: net.IPNet{IP: ip, Mask: net.IPv4Mask(255, 255, 255, 255)}, ZoneID: types.ZoneID(subs) - 1, TPAddr: "1-ff00:0:1,127.0.0.1"})
 
 	}
-	t := types.Transfers{
+	t := types.Transitions{
 		types.ZoneID(subs) - 1: {},
 	}
 	for i := 0; i < trans; i++ {

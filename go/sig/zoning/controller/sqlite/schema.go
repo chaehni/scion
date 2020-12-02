@@ -29,7 +29,7 @@ const (
 		FOREIGN KEY (tp_address) REFERENCES Sites(tp_address) ON DELETE CASCADE
 	  );
 	  
-	  CREATE TABLE Transfers(
+	  CREATE TABLE Transitions(
 		src INTEGER NOT NULL,
 		dest INTEGER NOT NULL,
 		PRIMARY KEY (src, dest) ON CONFLICT REPLACE,
@@ -37,8 +37,8 @@ const (
 		FOREIGN KEY (dest) REFERENCES Zones(id) ON DELETE CASCADE	
 	  )`
 
-	ZonesTable     = "Zones"
-	SitesTable     = "Sites"
-	SubnetsTable   = "Subnets"
-	TransfersTable = "Transfers"
+	ZonesTable       = "Zones"
+	SitesTable       = "Sites"
+	SubnetsTable     = "Subnets"
+	TransitionsTable = "Transitions"
 )

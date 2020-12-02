@@ -47,7 +47,7 @@ import (
 	"github.com/scionproto/scion/go/sig/internal/xnet"
 	"github.com/scionproto/scion/go/sig/zoning"
 	"github.com/scionproto/scion/go/sig/zoning/auth"
-	"github.com/scionproto/scion/go/sig/zoning/transfer"
+	"github.com/scionproto/scion/go/sig/zoning/transition"
 )
 
 var (
@@ -242,9 +242,9 @@ func setupModules() {
 	cm := zoning.NewCoreModule()
 	mods["core"] = cm
 
-	fetcher := transfer.NewRuleFetcher(cfg.Sig.IA, cfg.Sig.IP, cfg.TP.TransConf)
-	tm := transfer.NewModule(fetcher, cfg.TP.TransConf)
-	transfer.Init()
+	fetcher := transition.NewRuleFetcher(cfg.Sig.IA, cfg.Sig.IP, cfg.TP.TransConf)
+	tm := transition.NewModule(fetcher, cfg.TP.TransConf)
+	transition.Init()
 	tm.StartFetcher()
 	mods["trans"] = tm
 

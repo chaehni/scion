@@ -158,9 +158,9 @@ func (b *Backend) InsertSubnet(zoneID int, net net.IPNet, tpAddr string) error {
 	return nil
 }
 
-// InsertTransfers inserts premitted zone transfers into the Backend
-func (b *Backend) InsertTransfers(transfers types.Transfers) error {
-	stmt := `INSERT INTO Transfers (src, dest) VALUES (?, ?)`
+// InsertTransitions inserts premitted zone transitions into the Backend
+func (b *Backend) InsertTransitions(transitions types.Transitions) error {
+	stmt := `INSERT INTO Transitions (src, dest) VALUES (?, ?)`
 
 	// do insertion in a transaction to ensure atomicity
 	tx, err := b.db.BeginTx(context.Background(), nil)
@@ -168,7 +168,7 @@ func (b *Backend) InsertTransfers(transfers types.Transfers) error {
 		return err
 	}
 
-	for src, dests := range transfers {
+	for src, dests := range transitions {
 		for _, dest := range dests {
 			_, err = tx.Exec(stmt, src, dest)
 			if err != nil {
@@ -213,9 +213,9 @@ func (b *Backend) DeleteSubnet(net net.IPNet) error {
 	return nil
 }
 
-// DeleteTransfers inserts premitted zone transfers into the Backend
-func (b *Backend) DeleteTransfers(transfers map[int][]int) error {
-	stmt := `DELETE FROM Transfers WHERE src = ? AND dest = ?`
+// DeleteTransitions inserts premitted zone transitions into the Backend
+func (b *Backend) DeleteTransitions(transitions types.Transitions) error {
+	stmt := `DELETE FROM Transitions WHERE src = ? AND dest = ?`
 
 	// do insertion in a transaction to ensure atomicity
 	tx, err := b.db.BeginTx(context.Background(), nil)
@@ -223,7 +223,7 @@ func (b *Backend) DeleteTransfers(transfers map[int][]int) error {
 		return err
 	}
 
-	for src, dests := range transfers {
+	for src, dests := range transitions {
 		for _, dest := range dests {
 			_, err = tx.Exec(stmt, src, dest)
 			if err != nil {
@@ -272,11 +272,11 @@ func (b *Backend) GetSubnets(tpAddr string) ([]*types.Subnet, error) {
 		WHERE  tp_address = ?), 
 	possible_dests 
 	AS (SELECT DISTINCT dest
-		FROM   transfers 
+		FROM   transitions 
 		WHERE  src IN tp_zones AND dest NOT IN tp_zones), 
 	possible_src 
 	AS (SELECT DISTINCT src
-		FROM  transfers 
+		FROM  transitions 
 		WHERE  dest IN tp_zones AND src NOT IN tp_zones) 
 	SELECT net_ip, net_mask, zone, tp_address 
 	FROM   subnets 
@@ -303,17 +303,17 @@ func (b *Backend) GetSubnets(tpAddr string) ([]*types.Subnet, error) {
 	return nets, nil
 }
 
-// GetAllTransfers returns all allowed dtransfers stored in the backend
-func (b *Backend) GetAllTransfers() (map[int][]int, error) {
+// GetAllTransitions returns all allowed dtransitions stored in the backend
+func (b *Backend) GetAllTransitions() (map[int][]int, error) {
 	stmt := `SELECT src, dest 
-	FROM   transfers`
+	FROM   transitions`
 
 	rows, err := b.db.Query(stmt)
 	if err != nil {
 		return nil, err
 	}
 
-	transfers := make(map[int][]int)
+	transitions := make(map[int][]int)
 	var src int
 	var dest int
 	for rows.Next() {
@@ -321,24 +321,24 @@ func (b *Backend) GetAllTransfers() (map[int][]int, error) {
 		if err != nil {
 			return nil, err
 		}
-		dests, ok := transfers[src]
+		dests, ok := transitions[src]
 		if !ok {
-			transfers[src] = []int{dest}
+			transitions[src] = []int{dest}
 			continue
 		}
-		transfers[src] = append(dests, dest)
+		transitions[src] = append(dests, dest)
 	}
-	return transfers, nil
+	return transitions, nil
 }
 
-// GetTransfers returns all allowed transfers of a given TP stored in the backend
-func (b *Backend) GetTransfers(tpAddr string) (map[int][]int, error) {
+// GetTransitions returns all allowed transitions of a given TP stored in the backend
+func (b *Backend) GetTransitions(tpAddr string) (map[int][]int, error) {
 	stmt := `WITH relevant_zones 
 	AS (SELECT DISTINCT zone 
 		FROM   subnets 
 		WHERE  tp_address = ?) 
 	SELECT src, dest 
-	FROM   transfers 
+	FROM   transitions 
 	WHERE  src IN relevant_zones 
 	   OR dest IN relevant_zones`
 
@@ -347,7 +347,7 @@ func (b *Backend) GetTransfers(tpAddr string) (map[int][]int, error) {
 		return nil, err
 	}
 
-	transfers := make(map[int][]int)
+	transitions := make(map[int][]int)
 	var src int
 	var dest int
 	for rows.Next() {
@@ -355,12 +355,12 @@ func (b *Backend) GetTransfers(tpAddr string) (map[int][]int, error) {
 		if err != nil {
 			return nil, err
 		}
-		dests, ok := transfers[src]
+		dests, ok := transitions[src]
 		if !ok {
-			transfers[src] = []int{dest}
+			transitions[src] = []int{dest}
 			continue
 		}
-		transfers[src] = append(dests, dest)
+		transitions[src] = append(dests, dest)
 	}
-	return transfers, nil
+	return transitions, nil
 }

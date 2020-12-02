@@ -1,4 +1,4 @@
-package transfer
+package transition
 
 import (
 	"crypto/tls"
@@ -16,7 +16,7 @@ import (
 // Fetcher is used to fetch controller information from the controller
 type Fetcher interface {
 	FetchSubnets() (types.Subnets, error)
-	FetchTransfers() (types.Transfers, error)
+	FetchTransitions() (types.Transitions, error)
 }
 
 var _ = Fetcher(&RuleFetcher{})
@@ -63,18 +63,18 @@ func (f *RuleFetcher) FetchSubnets() (types.Subnets, error) {
 	return subnets, nil
 }
 
-// FetchTransfers fechtches the configured transfers information from the controller
-func (f *RuleFetcher) FetchTransfers() (types.Transfers, error) {
-	resp, err := f.client.Post(fmt.Sprintf("https://%s/api/get-transfers", f.controllerAddr), "text/plain", strings.NewReader(f.localAddr))
+// FetchTransitions fechtches the configured transitions information from the controller
+func (f *RuleFetcher) FetchTransitions() (types.Transitions, error) {
+	resp, err := f.client.Post(fmt.Sprintf("https://%s/api/get-transitions", f.controllerAddr), "text/plain", strings.NewReader(f.localAddr))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	decoder := json.NewDecoder(resp.Body)
-	transfers := types.Transfers{}
-	err = decoder.Decode(&transfers)
+	transitions := types.Transitions{}
+	err = decoder.Decode(&transitions)
 	if err != nil {
 		return nil, err
 	}
-	return transfers, nil
+	return transitions, nil
 }

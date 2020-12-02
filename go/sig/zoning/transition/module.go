@@ -1,4 +1,4 @@
-package transfer
+package transition
 
 import (
 	"crypto/tls"
@@ -19,7 +19,7 @@ import (
 	"github.com/yl2chen/cidranger"
 )
 
-// Init initializes the transfer package
+// Init initializes the transition package
 func Init() {
 	fatal.Check()
 }
@@ -29,15 +29,15 @@ var errorPrefix = "[TransferModule]"
 
 var _ = zoning.Module(&Module{})
 
-// Module implements the transfer module.
-// It checks packets for valid zone transfers.
+// Module implements the transition module.
+// It checks packets for valid zone transitions.
 type Module struct {
 	//subnets   types.Subnets
 	cfg    tpconfig.TransConf
 	ranger cidranger.Ranger
-	//transfers types.Transfers
-	transfers map[types.ZoneID]map[types.ZoneID]struct{}
-	client    *http.Client
+	//transitions types.Transitions
+	transitions map[types.ZoneID]map[types.ZoneID]struct{}
+	client      *http.Client
 
 	fetcher Fetcher
 
@@ -48,9 +48,9 @@ type Module struct {
 func NewModule(fetcher Fetcher, cfg tpconfig.TransConf) *Module {
 
 	return &Module{
-		cfg:       cfg,
-		ranger:    cidranger.NewPCTrieRanger(),
-		transfers: make(map[types.ZoneID]map[types.ZoneID]struct{}),
+		cfg:         cfg,
+		ranger:      cidranger.NewPCTrieRanger(),
+		transitions: make(map[types.ZoneID]map[types.ZoneID]struct{}),
 		client: &http.Client{
 			Transport: shttp.NewRoundTripper(&tls.Config{InsecureSkipVerify: true}, nil),
 		},
@@ -60,7 +60,7 @@ func NewModule(fetcher Fetcher, cfg tpconfig.TransConf) *Module {
 	}
 }
 
-// Handle checks packets for valid zone transfers
+// Handle checks packets for valid zone transitions
 func (m *Module) Handle(pkt zoning.Packet) (zoning.Packet, error) {
 	if pkt.Ingress {
 		return m.handleIngress(pkt)
@@ -88,7 +88,7 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 		return zoning.NilPacket, fmt.Errorf("%v source TP %v is not responsible for claimed source %v", errorPrefix, pkt.RemoteTP, pkt.SrcHost)
 	}
 
-	// check if transfer is allowed
+	// check if transition is allowed
 	err = m.checkTransfer(srcZone, destZone)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("%v %v", errorPrefix, err)
@@ -112,7 +112,7 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	pkt.RemoteTP = dstTP
 	pkt.DstZone = uint32(destZone)
 
-	// check if transfer is allowed
+	// check if transition is allowed
 	err = m.checkTransfer(srcZone, destZone)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("%v %v", errorPrefix, err)
@@ -134,18 +134,18 @@ func (m *Module) findZone(ip net.IP) (types.ZoneID, string, error) {
 }
 
 func (m *Module) checkTransfer(from, to types.ZoneID) error {
-	outer, ok := m.transfers[from]
+	outer, ok := m.transitions[from]
 	if !ok {
-		return fmt.Errorf("%v no transfer rules found for source zone %v", errorPrefix, from)
+		return fmt.Errorf("%v no transition rules found for source zone %v", errorPrefix, from)
 	}
 	_, ok = outer[to]
 	if !ok {
-		return fmt.Errorf("%v transfer from zone %v to zone %v not allowed", errorPrefix, from, to)
+		return fmt.Errorf("%v transition from zone %v to zone %v not allowed", errorPrefix, from, to)
 	}
 	return nil
 }
 
-// StartFetcher starts the periodic fetcher assigned to the transfer module
+// StartFetcher starts the periodic fetcher assigned to the transition module
 func (m *Module) StartFetcher() {
 	// start periodic task fetching info from controller
 	ticker := time.NewTicker(m.cfg.RefrehInterval.Duration)
@@ -154,11 +154,11 @@ func (m *Module) StartFetcher() {
 	if err != nil {
 		log.Fatal(fmt.Errorf("%v Failed to fetch initial subnets data from controller: %v", errorPrefix, err))
 	}
-	transfers, err := m.fetcher.FetchTransfers()
+	transitions, err := m.fetcher.FetchTransitions()
 	if err != nil {
-		fatal.Fatal(fmt.Errorf("%v Failed to fetch initial transfer data from controller: %v", errorPrefix, err))
+		fatal.Fatal(fmt.Errorf("%v Failed to fetch initial transition data from controller: %v", errorPrefix, err))
 	}
-	m.setInfo(subnets, transfers)
+	m.setInfo(subnets, transitions)
 	go func() {
 		for range ticker.C {
 			subnets, err := m.fetcher.FetchSubnets()
@@ -167,31 +167,31 @@ func (m *Module) StartFetcher() {
 			if err != nil {
 				fatal.Fatal(err)
 			}
-			transfers, err := m.fetcher.FetchTransfers()
+			transitions, err := m.fetcher.FetchTransitions()
 			if err != nil {
 				fatal.Fatal(err)
 			}
 
-			m.setInfo(subnets, transfers)
+			m.setInfo(subnets, transitions)
 		}
 	}()
 }
 
-func (m *Module) setInfo(nets types.Subnets, transfers types.Transfers) {
+func (m *Module) setInfo(nets types.Subnets, transitions types.Transitions) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	for _, net := range nets {
 		m.ranger.Insert(net)
 	}
-	for outer, slice := range transfers {
-		if m.transfers[outer] == nil {
-			m.transfers[outer] = make(map[types.ZoneID]struct{})
+	for outer, slice := range transitions {
+		if m.transitions[outer] == nil {
+			m.transitions[outer] = make(map[types.ZoneID]struct{})
 		}
 		for _, inner := range slice {
-			m.transfers[outer][inner] = struct{}{}
+			m.transitions[outer][inner] = struct{}{}
 		}
 	}
-	//m.transfers = transfers
+	//m.transitions = transitions
 
 }

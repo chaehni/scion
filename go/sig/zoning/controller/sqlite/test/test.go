@@ -7,6 +7,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/scionproto/scion/go/sig/zoning/controller/sqlite"
+	"github.com/scionproto/scion/go/sig/zoning/types"
 )
 
 func main() {
@@ -40,13 +41,13 @@ func main() {
 		panic(err)
 	}
 
-	// transfers
-	t := map[int][]int{
+	// transitions
+	t := types.Transitions{
 		1:   {1, 345},
 		345: {345, 1},
 	}
 
-	err = db.InsertTransfers(t)
+	err = db.InsertTransitions(t)
 	if err != nil {
 		panic(err)
 	}
@@ -57,8 +58,8 @@ func main() {
 		panic(err)
 	} */
 
-	// delete transfers
-	err = db.DeleteTransfers(t)
+	// delete transitions
+	err = db.DeleteTransitions(t)
 	if err != nil {
 		panic(err)
 	}

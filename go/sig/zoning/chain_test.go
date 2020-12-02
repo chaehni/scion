@@ -11,7 +11,7 @@ import (
 	"github.com/scionproto/scion/go/sig/zoning"
 	"github.com/scionproto/scion/go/sig/zoning/auth"
 	"github.com/scionproto/scion/go/sig/zoning/tpconfig"
-	"github.com/scionproto/scion/go/sig/zoning/transfer"
+	"github.com/scionproto/scion/go/sig/zoning/transition"
 	"github.com/scionproto/scion/go/sig/zoning/types"
 )
 
@@ -34,8 +34,8 @@ func BenchmarkLocal(b *testing.B) {
 
 		cm := zoning.NewCoreModule()
 		subs, trans := setupRules(100000, 100000)
-		fetcher := transfer.NewMockFetcher(subs, trans)
-		tm := transfer.NewModule(fetcher, cfg.TransConf)
+		fetcher := transition.NewMockFetcher(subs, trans)
+		tm := transition.NewModule(fetcher, cfg.TransConf)
 		tm.StartFetcher()
 
 		chain := zoning.Chain{}
@@ -73,8 +73,8 @@ func BenchmarkRemoteEgress(b *testing.B) {
 
 	cm := zoning.NewCoreModule()
 	subs, trans := setupRules(100000, 100000)
-	fetcher := transfer.NewMockFetcher(subs, trans)
-	tm := transfer.NewModule(fetcher, cfg.TransConf)
+	fetcher := transition.NewMockFetcher(subs, trans)
+	tm := transition.NewModule(fetcher, cfg.TransConf)
 	tm.StartFetcher()
 	km := auth.NewKeyMan([]byte("master_secret"), net.IP{}, cfg.AuthConf, true)
 	km.FillKeyStore(100000)
@@ -118,8 +118,8 @@ func BenchmarkRemoteIngress(b *testing.B) {
 
 			cm := zoning.NewCoreModule()
 			subs, trans := setupRules(100000, 100000)
-			fetcher := transfer.NewMockFetcher(subs, trans)
-			tm := transfer.NewModule(fetcher, cfg.TransConf)
+			fetcher := transition.NewMockFetcher(subs, trans)
+			tm := transition.NewModule(fetcher, cfg.TransConf)
 			tm.StartFetcher()
 			km := auth.NewKeyMan([]byte("master_secret"), net.IP{}, cfg.AuthConf, true)
 			km.FillKeyStore(100)
@@ -159,7 +159,7 @@ func BenchmarkRemoteIngress(b *testing.B) {
 	}
 }
 
-func setupRules(subs, trans int) (types.Subnets, types.Transfers) {
+func setupRules(subs, trans int) (types.Subnets, types.Transitions) {
 	nets := types.Subnets{}
 	for i := 0; i < subs; i++ {
 		ip := make(net.IP, 4)
@@ -167,7 +167,7 @@ func setupRules(subs, trans int) (types.Subnets, types.Transfers) {
 		nets = append(nets, &types.Subnet{IPNet: net.IPNet{IP: ip, Mask: net.IPv4Mask(255, 255, 255, 255)}, ZoneID: types.ZoneID(subs) - 1, TPAddr: fmt.Sprintf("%016x", i)})
 
 	}
-	t := types.Transfers{
+	t := types.Transitions{
 		types.ZoneID(subs) - 1: {},
 	}
 	for i := 0; i < trans; i++ {

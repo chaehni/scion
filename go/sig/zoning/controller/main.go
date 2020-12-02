@@ -31,14 +31,14 @@ func main() {
 
 	/*** API used by Zone Translation Points ***/
 	http.HandleFunc("/api/get-subnets", apiChain(handler.GetSubnetsHandler))
-	http.HandleFunc("/api/get-transfers", apiChain(handler.GetTransfersHandler))
+	http.HandleFunc("/api/get-transitions", apiChain(handler.GetTransitionsHandler))
 
 	/*** API used by admin frontend ***/
 	//TODO: iplement frontend
 	http.HandleFunc("/", handler.IndexHandler)
 	http.HandleFunc("/api/get-all-subnets", apiChain(handler.GetAllSubnetsHandler))
-	http.HandleFunc("/api/get-all-transfers", apiChain(handler.GetAllTransfersHandler))
-	http.HandleFunc("/api/insert-transfers", apiChain(handler.InsertTransfersHandler))
+	http.HandleFunc("/api/get-all-transitions", apiChain(handler.GetAllTransitionsHandler))
+	http.HandleFunc("/api/insert-transitions", apiChain(handler.InsertTransitionsHandler))
 
 	go func() {
 		log.Fatal(http.ListenAndServeTLS("192.168.1.11:4433", "cert.pem", "key.pem", nil))

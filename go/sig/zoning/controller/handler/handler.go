@@ -63,17 +63,17 @@ func GetAllSubnetsHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(nets)
 }
 
-// InsertTransfersHandler inserts the given transfers into the backend
-func InsertTransfersHandler(w http.ResponseWriter, r *http.Request) {
-	// decode body into transfers
-	var transfers types.Transfers
-	err := json.NewDecoder(r.Body).Decode(&transfers)
+// InsertTransitionsHandler inserts the given transitions into the backend
+func InsertTransitionsHandler(w http.ResponseWriter, r *http.Request) {
+	// decode body into transitions
+	var transitions types.Transitions
+	err := json.NewDecoder(r.Body).Decode(&transitions)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, err.Error())
 		return
 	}
-	err = db.InsertTransfers(transfers)
+	err = db.InsertTransitions(transitions)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, err.Error())
@@ -83,12 +83,12 @@ func InsertTransfersHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// GetAllTransfersHandler returns all transfer information to the client
-func GetAllTransfersHandler(w http.ResponseWriter, r *http.Request) {
+// GetAllTransitionsHandler returns all transition information to the client
+func GetAllTransitionsHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: the shttp package is very basic and does not allow to set the local address
 	// therefore the handler sees the default ISD-AS,127.0.0.1 address as remote. The public IP of the TP is therfore sent
 	// in the body. This should be checked to match the certificate
-	transfers, err := db.GetAllTransfers()
+	transitions, err := db.GetAllTransitions()
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, err.Error())
@@ -97,11 +97,11 @@ func GetAllTransfersHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "    ") //TODO: remove after testing
-	enc.Encode(transfers)
+	enc.Encode(transitions)
 }
 
-// GetTransfersHandler returns all transfer information to the client
-func GetTransfersHandler(w http.ResponseWriter, r *http.Request) {
+// GetTransitionsHandler returns all transition information to the client
+func GetTransitionsHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: the shttp package is very basic and does not allow to set the local address
 	// therefore the handler sees the default ISD-AS,127.0.0.1 address as remote. The public IP of the TP is therfore sent
 	// in the body. This should be checked to match the certificate
@@ -111,7 +111,7 @@ func GetTransfersHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, err)
 		return
 	}
-	transfers, err := db.GetTransfers(string(buf))
+	transitions, err := db.GetTransitions(string(buf))
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, err.Error())
@@ -120,7 +120,7 @@ func GetTransfersHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "    ") //TODO: remove after testing
-	enc.Encode(transfers)
+	enc.Encode(transitions)
 }
 
 // LogHandler logs incoming HTTP requests
@@ -193,13 +193,13 @@ func setupDB() *sqlite.Backend {
 		panic(err)
 	}
 
-	t := types.Transfers{
+	t := types.Transitions{
 		/* 	1:   {1, 345},
 		345: {345, 1},
 		456: {2, 3, 4, 5}, */
 	}
 
-	err = db.InsertTransfers(t)
+	err = db.InsertTransitions(t)
 	if err != nil {
 		panic(err)
 	}
