@@ -21,6 +21,7 @@ import (
 
 	"github.com/scionproto/scion/go/lib/metrics"
 	"github.com/scionproto/scion/go/lib/snet"
+	"github.com/scionproto/scion/go/pkg/gateway/zoning"
 )
 
 type PathStatsPublisher interface {
@@ -72,7 +73,15 @@ func (s *Session) Write(pkt []byte) {
 	if s.sender == nil {
 		return
 	}
-	s.sender.Write(pkt)
+
+	// egress pipeline
+	hpkt, err := zoning.EgressChain.Handle(zoning.Packet{Ingress: false, RawPacket: pkt})
+	if err != nil {
+		fmt.Printf("Zoning error: %v", err)
+		return
+	}
+
+	s.sender.Write(hpkt.RawPacket)
 }
 
 func (s *Session) String() string {

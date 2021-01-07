@@ -26,6 +26,7 @@ import (
 	"github.com/scionproto/scion/go/lib/ringbuf"
 	"github.com/scionproto/scion/go/lib/serrors"
 	"github.com/scionproto/scion/go/lib/snet"
+	"github.com/scionproto/scion/go/pkg/gateway/zoning"
 )
 
 const (
@@ -150,6 +151,15 @@ func (w *worker) cleanup() {
 }
 
 func (w *worker) send(packet common.RawBytes) error {
+
+	// ingress pipeline
+	pkt, err := zoning.IngressChain.Handle(
+		zoning.Packet{Ingress: true, RemoteTP: fmt.Sprintf("%s,%s", w.Remote.IA, w.Remote.Host.IP), RawPacket: packet})
+	if err != nil {
+		return err
+	}
+	packet = pkt.RawPacket
+
 	bytesWritten, err := w.tunIO.Write(packet)
 	if err != nil {
 		increaseCounterMetric(w.Metrics.SendLocalError, 1)

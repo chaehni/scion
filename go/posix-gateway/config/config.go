@@ -21,6 +21,7 @@ import (
 	"github.com/scionproto/scion/go/lib/env"
 	"github.com/scionproto/scion/go/lib/log"
 	gatewayconfig "github.com/scionproto/scion/go/pkg/gateway/config"
+	"github.com/scionproto/scion/go/pkg/gateway/zoning/tpconfig"
 )
 
 type Config struct {
@@ -30,6 +31,7 @@ type Config struct {
 	Daemon   env.SCIONDClient      `toml:"sciond_connection,omitempty"`
 	Gateway  gatewayconfig.Gateway `toml:"gateway,omitempty"`
 	Tunnel   gatewayconfig.Tunnel  `toml:"tunnel,omitempty"`
+	TP       tpconfig.TPConf       `toml:"tp,omitempty"`
 }
 
 func (cfg *Config) InitDefaults() {

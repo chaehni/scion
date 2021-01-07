@@ -23,6 +23,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/syndtr/gocapability/capability"
@@ -40,6 +41,9 @@ import (
 	"github.com/scionproto/scion/go/pkg/command"
 	"github.com/scionproto/scion/go/pkg/gateway"
 	"github.com/scionproto/scion/go/pkg/gateway/xnet"
+	"github.com/scionproto/scion/go/pkg/gateway/zoning"
+	"github.com/scionproto/scion/go/pkg/gateway/zoning/auth"
+	"github.com/scionproto/scion/go/pkg/gateway/zoning/transition"
 	"github.com/scionproto/scion/go/pkg/service"
 	"github.com/scionproto/scion/go/posix-gateway/config"
 )
@@ -68,6 +72,8 @@ func main() {
 		command.NewVersion(cmd),
 	)
 	cmd.Flags().StringVar(&flags.config, "config", "", "Configuration file (required)")
+	cmd.Flags().StringVar(&egressChain, "egress", "", "configure the egress chain")
+	cmd.Flags().StringVar(&ingressChain, "ingress", "", "configure the ingress chain")
 	cmd.MarkFlagRequired("config")
 	if err := cmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
@@ -158,6 +164,9 @@ func run(file string) error {
 		Metrics:                  gateway.NewMetrics(),
 	}
 
+	// Zoning
+	setupModules(cfg, dataAddress.IP)
+
 	errs := make(chan error, 1)
 	go func() {
 		defer log.HandlePanic()
@@ -230,4 +239,73 @@ func dropNetworkCapabilities() error {
 	caps.Clear(capability.CAPS)
 	caps.Apply(capability.CAPS)
 	return nil
+}
+
+var mods = make(map[string]zoning.Module)
+var (
+	ingressChain string
+	egressChain  string
+)
+
+func setupModules(cfg config.Config, gwIP net.IP) {
+
+	sciondConn, _ := sciond.NewService(sciond.DefaultAPIAddress).Connect(context.Background())
+	ia, _ := sciondConn.LocalIA(context.Background())
+
+	cm := zoning.NewCoreModule()
+	mods["core"] = cm
+
+	fetcher := transition.NewRuleFetcher(ia, gwIP, cfg.TP.TransConf)
+	tm := transition.NewModule(fetcher, cfg.TP.TransConf)
+	transition.Init()
+	tm.StartFetcher()
+	mods["trans"] = tm
+
+	keyman := auth.NewKeyMan([]byte("KEY"), gwIP, cfg.TP.AuthConf, false)
+	transformer := auth.NewTR()
+	am := auth.NewModule(keyman, transformer, cfg.TP.AuthConf)
+	auth.Init()
+	keyman.ServeL1()
+	mods["auth"] = am
+
+	lm := &zoning.LogModule{LocalTP: fmt.Sprintf("%v,%v", ia, gwIP)}
+	mods["log"] = lm
+
+	// create ingress chain
+	if len(ingressChain) == 0 {
+		fmt.Print("[inress chain]: {no modules}\n")
+	} else {
+		s := strings.Split(ingressChain, ",")
+		fmt.Print("[ingress chain]: ")
+		modList := []string{}
+		for _, m := range s {
+			md, ok := mods[m]
+			if !ok {
+				log.Error("unrecognized module", "module", m)
+				continue
+			}
+			zoning.IngressChain.Register(md)
+			modList = append(modList, m)
+		}
+		fmt.Printf("%v\n", strings.Join(modList, ","))
+	}
+
+	// create egress chain
+	if len(egressChain) == 0 {
+		fmt.Print("[egress chain]: {no modules}\n")
+	} else {
+		s := strings.Split(egressChain, ",")
+		fmt.Print("[egress chain]: ")
+		modList := []string{}
+		for _, m := range s {
+			md, ok := mods[m]
+			if !ok {
+				log.Error("unrecognized module", "module", m)
+				continue
+			}
+			zoning.EgressChain.Register(md)
+			modList = append(modList, m)
+		}
+		fmt.Printf("%v\n", strings.Join(modList, ","))
+	}
 }
