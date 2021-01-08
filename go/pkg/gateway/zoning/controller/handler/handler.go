@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"net/http/httputil"
 
-	"github.com/scionproto/scion/go/sig/zoning/controller/sqlite"
-	"github.com/scionproto/scion/go/sig/zoning/types"
+	"github.com/scionproto/scion/go/pkg/gateway/zoning/controller/sqlite"
+	"github.com/scionproto/scion/go/pkg/gateway/zoning/types"
 )
 
 var db *sqlite.Backend

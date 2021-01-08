@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/serrors"
+
 	"github.com/scionproto/scion/go/lib/snet"
-	"github.com/scionproto/scion/go/sig/zoning/types"
+	"github.com/scionproto/scion/go/pkg/gateway/zoning/types"
 )
 
 var maxZoneID = 1<<24 - 1
@@ -42,7 +43,7 @@ func New(path string) (*Backend, error) {
 
 	// Make sure DB is reachable
 	if err = db.Ping(); err != nil {
-		return nil, common.NewBasicError("Initial DB ping failed, connection broken?", err,
+		return nil, serrors.New("Initial DB ping failed, connection broken?", err,
 			"path", path)
 	}
 
@@ -62,16 +63,16 @@ func New(path string) (*Backend, error) {
 	var enabled bool
 	err = db.QueryRow("PRAGMA foreign_keys;").Scan(&enabled)
 	if err == sql.ErrNoRows {
-		return nil, common.NewBasicError("Foreign keys not supported", err,
+		return nil, serrors.New("Foreign keys not supported", err,
 			"path", path)
 	}
 	if err != nil {
-		return nil, common.NewBasicError("Failed to check for foreign key support", err,
+		return nil, serrors.New("Failed to check for foreign key support", err,
 			"path", path)
 	}
 	if !enabled {
 		db.Close()
-		return nil, common.NewBasicError("Failed to enable foreign key support", nil,
+		return nil, serrors.New("Failed to enable foreign key support", nil,
 			"path", path)
 	}
 
@@ -79,7 +80,7 @@ func New(path string) (*Backend, error) {
 	var existingVersion int
 	err = db.QueryRow("PRAGMA user_version;").Scan(&existingVersion)
 	if err != nil {
-		return nil, common.NewBasicError("Failed to check schema version", err,
+		return nil, serrors.New("Failed to check schema version", err,
 			"path", path)
 	}
 	if existingVersion == 0 {
@@ -87,7 +88,7 @@ func New(path string) (*Backend, error) {
 			return nil, err
 		}
 	} else if existingVersion != SchemaVersion {
-		return nil, common.NewBasicError("Database schema version mismatch", nil,
+		return nil, serrors.New("Database schema version mismatch", nil,
 			"expected", SchemaVersion, "have", existingVersion, "path", path)
 	}
 	return &Backend{db: db}, nil
@@ -96,12 +97,12 @@ func New(path string) (*Backend, error) {
 func setup(db *sql.DB, schema string, schemaVersion int, path string) error {
 	_, err := db.Exec(schema)
 	if err != nil {
-		return common.NewBasicError("Failed to set up SQLite database", err, "path", path)
+		return serrors.New("Failed to set up SQLite database", err, "path", path)
 	}
 	// Write schema version to database.
 	_, err = db.Exec(fmt.Sprintf("PRAGMA user_version = %d;", schemaVersion))
 	if err != nil {
-		return common.NewBasicError("Failed to write schema version", err, "path", path)
+		return serrors.New("Failed to write schema version", err, "path", path)
 	}
 	return nil
 }

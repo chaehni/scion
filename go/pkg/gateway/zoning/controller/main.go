@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/netsec-ethz/scion-apps/pkg/shttp"
-	"github.com/scionproto/scion/go/sig/zoning/controller/handler"
+	//	"github.com/netsec-ethz/scion-apps/pkg/shttp"
+	"github.com/scionproto/scion/go/pkg/gateway/zoning/controller/handler"
 )
 
 func main() {
@@ -40,9 +40,9 @@ func main() {
 	http.HandleFunc("/api/get-all-transitions", apiChain(handler.GetAllTransitionsHandler))
 	http.HandleFunc("/api/insert-transitions", apiChain(handler.InsertTransitionsHandler))
 
-	go func() {
-		log.Fatal(http.ListenAndServeTLS("192.168.1.11:4433", "cert.pem", "key.pem", nil))
-	}()
+	// go func() {
+	log.Fatal(http.ListenAndServeTLS("192.168.1.11:4433", "cert.pem", "key.pem", nil))
+	//}()
 
-	log.Fatal(shttp.ListenAndServe(":8080", nil))
+	//log.Fatal(shttp.ListenAndServe(":8080", nil))
 }
