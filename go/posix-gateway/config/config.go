@@ -42,6 +42,7 @@ func (cfg *Config) InitDefaults() {
 		&cfg.Daemon,
 		&cfg.Gateway,
 		&cfg.Tunnel,
+		&cfg.TP,
 	)
 }
 
