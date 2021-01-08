@@ -43,7 +43,7 @@ const (
 	defaultGatewayPollInterval = 5 * time.Second
 	// defaultGatewayPollTimeout is the default timeout for polling the remote
 	// gateway for prefixes.
-	defaultGatewayPollTimeout = 5 * time.Second
+	defaultGatewayPollTimeout = 15 * time.Second
 )
 
 var (
