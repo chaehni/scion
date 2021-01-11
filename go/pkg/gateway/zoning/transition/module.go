@@ -2,6 +2,7 @@ package transition
 
 import (
 	"crypto/tls"
+	"io"
 
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/netsec-ethz/scion-apps/pkg/shttp"
 	"github.com/scionproto/scion/go/lib/fatal"
+	"github.com/scionproto/scion/go/lib/serrors"
 	"github.com/scionproto/scion/go/pkg/gateway/zoning"
 	"github.com/scionproto/scion/go/pkg/gateway/zoning/tpconfig"
 	"github.com/scionproto/scion/go/pkg/gateway/zoning/types"
@@ -41,11 +43,13 @@ type Module struct {
 
 	fetcher Fetcher
 
+	tunnel io.ReadWriteCloser
+
 	lock sync.RWMutex
 }
 
 // NewModule creates a new Transfer Module
-func NewModule(fetcher Fetcher, cfg tpconfig.TransConf) *Module {
+func NewModule(fetcher Fetcher, cfg tpconfig.TransConf, tunnelIO io.ReadWriteCloser) *Module {
 
 	return &Module{
 		cfg:         cfg,
@@ -54,9 +58,8 @@ func NewModule(fetcher Fetcher, cfg tpconfig.TransConf) *Module {
 		client: &http.Client{
 			Transport: shttp.NewRoundTripper(&tls.Config{InsecureSkipVerify: true}, nil),
 		},
-		/* localAddr:      fmt.Sprintf("%v,%v", ia, ip),
-		controllerAddr: cfg.ControllerAddr, */
 		fetcher: fetcher,
+		tunnel:  tunnelIO,
 	}
 }
 
@@ -93,6 +96,7 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("%v %v", errorPrefix, err)
 	}
+
 	return pkt, nil
 }
 
@@ -101,7 +105,7 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	// get zones for src/dest
-	srcZone, _, err := m.findZone(pkt.SrcHost)
+	srcZone, srcTP, err := m.findZone(pkt.SrcHost)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("%v error finding source zone: %v", errorPrefix, err)
 	}
@@ -117,6 +121,15 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("%v %v", errorPrefix, err)
 	}
+
+	// send to internal if dst TP ==  src TP
+	if srcTP == dstTP {
+		_, err := m.tunnel.Write(pkt.RawPacket)
+		if err != nil {
+			return zoning.NilPacket, serrors.New("[TransferModule] Unable to write to internal ingress", "err", err, "length", len(pkt.RawPacket))
+		}
+	}
+
 	return pkt, nil
 }
 

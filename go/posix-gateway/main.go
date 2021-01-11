@@ -42,7 +42,6 @@ import (
 	"github.com/scionproto/scion/go/pkg/gateway"
 	"github.com/scionproto/scion/go/pkg/gateway/xnet"
 	"github.com/scionproto/scion/go/pkg/gateway/zoning"
-	"github.com/scionproto/scion/go/pkg/gateway/zoning/auth"
 	"github.com/scionproto/scion/go/pkg/gateway/zoning/transition"
 	"github.com/scionproto/scion/go/pkg/service"
 	"github.com/scionproto/scion/go/posix-gateway/config"
@@ -165,7 +164,7 @@ func run(file string) error {
 	}
 
 	// Zoning
-	setupModules(cfg, dataAddress.IP)
+	setupModules(cfg, dataAddress.IP, tunnelIO)
 
 	errs := make(chan error, 1)
 	go func() {
@@ -247,7 +246,7 @@ var (
 	egressChain  string
 )
 
-func setupModules(cfg config.Config, gwIP net.IP) {
+func setupModules(cfg config.Config, gwIP net.IP, tunnelIO io.ReadWriteCloser) {
 
 	sciondConn, _ := sciond.NewService(sciond.DefaultAPIAddress).Connect(context.Background())
 	ia, _ := sciondConn.LocalIA(context.Background())
@@ -256,17 +255,19 @@ func setupModules(cfg config.Config, gwIP net.IP) {
 	mods["core"] = cm
 
 	fetcher := transition.NewRuleFetcher(ia, gwIP, cfg.TP.TransConf)
-	tm := transition.NewModule(fetcher, cfg.TP.TransConf)
+	tm := transition.NewModule(fetcher, cfg.TP.TransConf, tunnelIO)
 	transition.Init()
 	tm.StartFetcher()
 	mods["trans"] = tm
 
-	keyman := auth.NewKeyMan([]byte("KEY"), gwIP, cfg.TP.AuthConf, false)
-	transformer := auth.NewTR()
-	am := auth.NewModule(keyman, transformer, cfg.TP.AuthConf)
-	auth.Init()
-	keyman.ServeL1()
-	mods["auth"] = am
+	/*
+		keyman := auth.NewKeyMan([]byte("KEY"), gwIP, cfg.TP.AuthConf, false)
+		transformer := auth.NewTR()
+		am := auth.NewModule(keyman, transformer, cfg.TP.AuthConf)
+		auth.Init()
+		keyman.ServeL1()
+		mods["auth"] = am
+	*/
 
 	lm := &zoning.LogModule{LocalTP: fmt.Sprintf("%v,%v", ia, gwIP)}
 	mods["log"] = lm
