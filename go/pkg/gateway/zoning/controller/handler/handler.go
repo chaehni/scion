@@ -144,7 +144,7 @@ func setupDB() *sqlite.Backend {
 	}
 
 	// add some test data
-	err = db.InsertZone(12, "A")
+	err = db.InsertZone(1, "gNB1")
 	if err != nil {
 		panic(err)
 	}
@@ -158,7 +158,12 @@ func setupDB() *sqlite.Backend {
 		panic(err)
 	} */
 
-	err = db.InsertZone(13, "B")
+	err = db.InsertZone(2, "gNB2")
+	if err != nil {
+		panic(err)
+	}
+
+	err = db.InsertZone(3, "MEC")
 	if err != nil {
 		panic(err)
 	}
@@ -176,27 +181,32 @@ func setupDB() *sqlite.Backend {
 		panic(err)
 	} */
 
-	err = db.InsertSite("1-ff00:0:112,172.16.0.12", "Site A")
+	err = db.InsertSite("1-ff00:0:112,127.0.0.1", "Site A")
 	if err != nil {
 		panic(err)
 	}
-	err = db.InsertSite("1-ff00:0:113,172.16.0.13", "Site B")
+	/* err = db.InsertSite("1-ff00:0:113,172.16.0.13", "Site B")
+	if err != nil {
+		panic(err)
+	} */
+	err = db.InsertSubnet(1, net.IPNet{IP: net.ParseIP("192.168.17.90"), Mask: net.IPv4Mask(255, 255, 255, 255)}, "1-ff00:0:112,127.0.0.1") // gNB1
 	if err != nil {
 		panic(err)
 	}
-	err = db.InsertSubnet(12, net.IPNet{IP: net.ParseIP("172.16.12.0"), Mask: net.IPv4Mask(255, 255, 255, 0)}, "1-ff00:0:112,172.16.0.12")
+	err = db.InsertSubnet(2, net.IPNet{IP: net.ParseIP("192.168.17.91"), Mask: net.IPv4Mask(255, 255, 255, 255)}, "1-ff00:0:112,127.0.0.1") // gNB 2
 	if err != nil {
 		panic(err)
 	}
-	err = db.InsertSubnet(13, net.IPNet{IP: net.ParseIP("172.16.13.0"), Mask: net.IPv4Mask(255, 255, 255, 0)}, "1-ff00:0:113,172.16.0.13")
+
+	err = db.InsertSubnet(3, net.IPNet{IP: net.ParseIP("192.168.14.100"), Mask: net.IPv4Mask(255, 255, 255, 255)}, "1-ff00:0:112,127.0.0.1") // MEC App Server
 	if err != nil {
 		panic(err)
 	}
 
 	t := types.Transitions{
-		/* 	1:   {1, 345},
-		345: {345, 1},
-		456: {2, 3, 4, 5}, */
+		1: {2, 3},
+		2: {3},
+		3: {1, 2},
 	}
 
 	err = db.InsertTransitions(t)

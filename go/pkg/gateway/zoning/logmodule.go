@@ -22,7 +22,7 @@ func (m *LogModule) Handle(pkt Packet) (Packet, error) {
 		if pkt.Ingress {
 			fmt.Printf("[ingress log] %v ---> %v ====> %v ---> %v\n%v\n", pkt.SrcHost, pkt.RemoteTP, m.LocalTP, pkt.DstHost, string(l4.Payload()))
 		} else {
-			fmt.Printf("[egress log] %v ---> %v ====> %v ---> %v\n%v\n", pkt.SrcHost, m.LocalTP, pkt.RemoteTP, pkt.DstHost, string(l4.Payload()))
+			fmt.Printf("[intra-domain log] %v ---> %v ---> %v\n%v\n", pkt.SrcHost, m.LocalTP, pkt.DstHost, string(l4.Payload()))
 		}
 	} else if lErr != nil {
 		if pkt.Ingress {

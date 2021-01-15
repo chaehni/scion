@@ -13,11 +13,11 @@ import (
 
 	"github.com/netsec-ethz/scion-apps/pkg/shttp"
 	"github.com/scionproto/scion/go/lib/fatal"
-	"github.com/scionproto/scion/go/lib/serrors"
 	"github.com/scionproto/scion/go/pkg/gateway/zoning"
 	"github.com/scionproto/scion/go/pkg/gateway/zoning/tpconfig"
 	"github.com/scionproto/scion/go/pkg/gateway/zoning/types"
 
+	"github.com/patrickmn/go-cache"
 	"github.com/yl2chen/cidranger"
 )
 
@@ -27,7 +27,7 @@ func Init() {
 }
 
 //var dummyErr = errors.New("dummy")
-var errorPrefix = "[TransferModule]"
+var errorPrefix = "[TransitionModule]"
 
 var _ = zoning.Module(&Module{})
 
@@ -46,9 +46,11 @@ type Module struct {
 	tunnel io.ReadWriteCloser
 
 	lock sync.RWMutex
+
+	cache *cache.Cache
 }
 
-// NewModule creates a new Transfer Module
+// NewModule creates a new Transition Module
 func NewModule(fetcher Fetcher, cfg tpconfig.TransConf, tunnelIO io.ReadWriteCloser) *Module {
 
 	return &Module{
@@ -60,6 +62,7 @@ func NewModule(fetcher Fetcher, cfg tpconfig.TransConf, tunnelIO io.ReadWriteClo
 		},
 		fetcher: fetcher,
 		tunnel:  tunnelIO,
+		cache:   cache.New(2*time.Second, 10*time.Minute),
 	}
 }
 
@@ -92,7 +95,7 @@ func (m *Module) handleIngress(pkt zoning.Packet) (zoning.Packet, error) {
 	}
 
 	// check if transition is allowed
-	err = m.checkTransfer(srcZone, destZone)
+	err = m.checkTransition(srcZone, destZone)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("%v %v", errorPrefix, err)
 	}
@@ -105,7 +108,7 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	// get zones for src/dest
-	srcZone, srcTP, err := m.findZone(pkt.SrcHost)
+	srcZone, _, err := m.findZone(pkt.SrcHost)
 	if err != nil {
 		return zoning.NilPacket, fmt.Errorf("%v error finding source zone: %v", errorPrefix, err)
 	}
@@ -116,19 +119,21 @@ func (m *Module) handleEgress(pkt zoning.Packet) (zoning.Packet, error) {
 	pkt.RemoteTP = dstTP
 	pkt.DstZone = uint32(destZone)
 
+	// check if established
+	established := false
+	cachedDst, ok := m.cache.Get(pkt.DstHost.String())
+	if ok && cachedDst.(string) == pkt.SrcHost.String() {
+		established = true
+	}
+
 	// check if transition is allowed
-	err = m.checkTransfer(srcZone, destZone)
-	if err != nil {
+	err = m.checkTransition(srcZone, destZone)
+	if err != nil && !established {
 		return zoning.NilPacket, fmt.Errorf("%v %v", errorPrefix, err)
 	}
 
-	// send to internal if dst TP ==  src TP
-	if srcTP == dstTP {
-		_, err := m.tunnel.Write(pkt.RawPacket)
-		if err != nil {
-			return zoning.NilPacket, serrors.New("[TransferModule] Unable to write to internal ingress", "err", err, "length", len(pkt.RawPacket))
-		}
-	}
+	// add to Established cache
+	m.cache.Set(pkt.SrcHost.String(), pkt.DstHost.String(), cache.DefaultExpiration)
 
 	return pkt, nil
 }
@@ -146,14 +151,14 @@ func (m *Module) findZone(ip net.IP) (types.ZoneID, string, error) {
 	//return 0, "", dummyErr
 }
 
-func (m *Module) checkTransfer(from, to types.ZoneID) error {
+func (m *Module) checkTransition(from, to types.ZoneID) error {
 	outer, ok := m.transitions[from]
 	if !ok {
-		return fmt.Errorf("%v no transition rules found for source zone %v", errorPrefix, from)
+		return fmt.Errorf("no transition rules found for source zone %v", from)
 	}
 	_, ok = outer[to]
 	if !ok {
-		return fmt.Errorf("%v transition from zone %v to zone %v not allowed", errorPrefix, from, to)
+		return fmt.Errorf("transition from zone %v to zone %v not allowed", from, to)
 	}
 	return nil
 }

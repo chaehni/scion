@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
@@ -37,13 +36,11 @@ import (
 	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/serrors"
 	"github.com/scionproto/scion/go/lib/snet/addrutil"
-	"github.com/scionproto/scion/go/lib/sock/reliable"
 	"github.com/scionproto/scion/go/pkg/command"
 	"github.com/scionproto/scion/go/pkg/gateway"
 	"github.com/scionproto/scion/go/pkg/gateway/xnet"
 	"github.com/scionproto/scion/go/pkg/gateway/zoning"
 	"github.com/scionproto/scion/go/pkg/gateway/zoning/transition"
-	"github.com/scionproto/scion/go/pkg/service"
 	"github.com/scionproto/scion/go/posix-gateway/config"
 )
 
@@ -96,7 +93,7 @@ func run(file string) error {
 
 	reloadConfigTrigger := make(chan struct{})
 
-	tunnelLink, tunnelIO, err := initTunnel(cfg)
+	_, tunnelIO, err := initTunnel(cfg)
 	if err != nil {
 		return serrors.WrapStr("initializing TUN device", err)
 	}
@@ -127,6 +124,7 @@ func run(file string) error {
 			return serrors.WrapStr("determine default local IP", err)
 		}
 	}
+
 	dataAddress, err := net.ResolveUDPAddr("udp", cfg.Gateway.DataAddr)
 	if err != nil {
 		return serrors.WrapStr("parsing data address", err)
@@ -135,43 +133,50 @@ func run(file string) error {
 		dataAddress.IP = controlAddress.IP
 		dataAddress.Zone = controlAddress.Zone
 	}
-	httpPages := service.StatusPages{
-		"info":      service.NewInfoHandler(),
-		"config":    service.NewConfigHandler(cfg),
-		"log/level": log.ConsoleLevel.ServeHTTP,
-	}
-	gw := &gateway.Gateway{
-		TrafficPolicyFile:        cfg.Gateway.TrafficPolicy,
-		RoutingPolicyFile:        cfg.Gateway.IPRoutingPolicy,
-		ControlServerAddr:        controlAddress,
-		ControlClientIP:          controlAddress.IP,
-		ServiceDiscoveryClientIP: controlAddress.IP,
-		PathMonitorIP:            controlAddress.IP,
-		ProbeServerAddr:          &net.UDPAddr{IP: controlAddress.IP, Port: 30856},
-		ProbeClientIP:            controlAddress.IP,
-		DataServerAddr:           dataAddress,
-		DataClientIP:             dataAddress.IP,
-		Dispatcher:               reliable.NewDispatcher(""),
-		Daemon:                   daemon,
-		InternalDevice:           tunnelIO,
-		RouteDevice:              tunnelLink,
-		RouteSource:              dataAddress.IP,
-		ConfigReloadTrigger:      reloadConfigTrigger,
-		HTTPEndpoints:            httpPages,
-		HTTPServeMux:             http.DefaultServeMux,
-		Logger:                   log.New(),
-		Metrics:                  gateway.NewMetrics(),
-	}
+
+	/*
+		httpPages := service.StatusPages{
+			"info":      service.NewInfoHandler(),
+			"config":    service.NewConfigHandler(cfg),
+			"log/level": log.ConsoleLevel.ServeHTTP,
+		}
+		gw := &gateway.Gateway{
+			TrafficPolicyFile:        cfg.Gateway.TrafficPolicy,
+			RoutingPolicyFile:        cfg.Gateway.IPRoutingPolicy,
+			ControlServerAddr:        controlAddress,
+			ControlClientIP:          controlAddress.IP,
+			ServiceDiscoveryClientIP: controlAddress.IP,
+			PathMonitorIP:            controlAddress.IP,
+			ProbeServerAddr:          &net.UDPAddr{IP: controlAddress.IP, Port: 30856},
+			ProbeClientIP:            controlAddress.IP,
+			DataServerAddr:           dataAddress,
+			DataClientIP:             dataAddress.IP,
+			Dispatcher:               reliable.NewDispatcher(""),
+			Daemon:                   daemon,
+			InternalDevice:           tunnelIO,
+			RouteDevice:              tunnelLink,
+			RouteSource:              dataAddress.IP,
+			ConfigReloadTrigger:      reloadConfigTrigger,
+			HTTPEndpoints:            httpPages,
+			HTTPServeMux:             http.DefaultServeMux,
+			Logger:                   log.New(),
+			Metrics:                  gateway.NewMetrics(),
+		} */
 
 	// Zoning
 	setupModules(cfg, dataAddress.IP, tunnelIO)
 
 	errs := make(chan error, 1)
-	go func() {
+	/* go func() {
 		defer log.HandlePanic()
 		if err := gw.Run(); err != nil {
 			errs <- err
 		}
+	}() */
+
+	go func() {
+		defer log.HandlePanic()
+		mainLoop(tunnelIO)
 	}()
 
 	env.SetupEnv(func() {
@@ -309,4 +314,31 @@ func setupModules(cfg config.Config, gwIP net.IP, tunnelIO io.ReadWriteCloser) {
 		}
 		fmt.Printf("%v\n", strings.Join(modList, ","))
 	}
+}
+
+func mainLoop(tunnel io.ReadWriteCloser) {
+
+	for {
+		buf := make([]byte, 2000)
+		n, err := tunnel.Read(buf)
+		if err != nil {
+			fmt.Printf("Error reading from tunnel: %v", err)
+		}
+		buf = buf[:n]
+		//fmt.Printf("Received packet with len %v\n", n)
+		// egress pipeline
+		pkt, err := zoning.EgressChain.Handle(zoning.Packet{Ingress: false, RawPacket: buf})
+		if err != nil {
+			fmt.Printf("Zoning error: %v\n", err)
+			continue
+		}
+
+		// send to internal if dst TP ==  src TP
+		_, err = tunnel.Write(pkt.RawPacket)
+		if err != nil {
+			fmt.Printf("Unable to write to internal ingress: %v\n", "err")
+		}
+
+	}
+
 }
