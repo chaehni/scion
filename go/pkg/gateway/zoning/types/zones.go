@@ -6,21 +6,19 @@ import (
 
 // ZoneID represents 24bit zone identifiers
 // TODO: possible check to make sure IDs are always in the range [0, 1<<24-1]
-type ZoneID int
-
-// Transfers maps a zone ID to all Zone IDs to which it is allowed to send data
-type Transitions map[ZoneID][]ZoneID
+type ZoneID uint
 
 // Zone denotes a network zone
 type Zone struct {
-	ID      ZoneID
-	Name    string
-	Subnets []*Subnet
+	ID   ZoneID
+	Name string
+	//	Subnets []*Subnet
 }
 
 // Site denotes a branch site of the network
 type Site struct {
 	TPAddr string
+	Name   string
 }
 
 // Subnet is an IP subnet that is located behind a TP
@@ -29,6 +27,9 @@ type Subnet struct {
 	ZoneID ZoneID
 	TPAddr string
 }
+
+// Transitions maps a zone ID to all Zone IDs to which it is allowed to send data
+type Transitions map[ZoneID][]ZoneID
 
 // Network implements the RangerEntry interface for use with github.com/yl2chen/cidranger
 func (s *Subnet) Network() net.IPNet {

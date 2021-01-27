@@ -26,6 +26,35 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Hello from the Controller")
 }
 
+/*** GET Handlers (Read) ***/
+
+// GetAllSitesHandler returns all sites information to the client
+func GetAllSitesHandler(w http.ResponseWriter, r *http.Request) {
+	sites, err := db.GetAllSites()
+	encodeAndSend(sites, err, w)
+}
+
+// GetAllZonesHandler returns all sites information to the client
+func GetAllZonesHandler(w http.ResponseWriter, r *http.Request) {
+	zones, err := db.GetAllZones()
+	encodeAndSend(zones, err, w)
+}
+
+// GetAllSubnetsHandler returns all subnet information to the client
+func GetAllSubnetsHandler(w http.ResponseWriter, r *http.Request) {
+	nets, err := db.GetAllSubnets()
+	encodeAndSend(nets, err, w)
+}
+
+// GetAllTransitionsHandler returns all transition information to the client
+func GetAllTransitionsHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: the shttp package is very basic and does not allow to set the local address
+	// therefore the handler sees the default ISD-AS,127.0.0.1 address as remote. The public IP of the TP is therfore sent
+	// in the body. This should be checked to match the certificate
+	transitions, err := db.GetAllTransitions()
+	encodeAndSend(transitions, err, w)
+}
+
 // GetSubnetsHandler returns the subnet information for a given TP to the client
 func GetSubnetsHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: the shttp package is very basic and does not allow to set the local address
@@ -38,20 +67,25 @@ func GetSubnetsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	nets, err := db.GetSubnets(string(buf))
-	if err != nil {
-		w.Header().Set("Content-Type", "text/plain")
-		io.WriteString(w, err.Error())
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "    ") //TODO: remove after testing
-	enc.Encode(nets)
+	encodeAndSend(nets, err, w)
 }
 
-// GetAllSubnetsHandler returns all subnet information to the client
-func GetAllSubnetsHandler(w http.ResponseWriter, r *http.Request) {
-	nets, err := db.GetAllSubnets()
+// GetTransitionsHandler returns all transition information to the client
+func GetTransitionsHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: the shttp package is very basic and does not allow to set the local address
+	// therefore the handler sees the default ISD-AS,127.0.0.1 address as remote. The public IP of the TP is therfore sent
+	// in the body. This should be checked to match the certificate
+	defer r.Body.Close()
+	buf, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	transitions, err := db.GetTransitions(string(buf))
+	encodeAndSend(transitions, err, w)
+}
+
+func encodeAndSend(data interface{}, err error, w http.ResponseWriter) {
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, err.Error())
@@ -60,7 +94,66 @@ func GetAllSubnetsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "    ") //TODO: remove after testing
-	enc.Encode(nets)
+	enc.Encode(data)
+}
+
+/*** POST Handlers (Insert) ***/
+
+// InsertSitesHandler inserts the given sites into the backend
+func InsertSitesHandler(w http.ResponseWriter, r *http.Request) {
+	// decode body into site
+	var sites []types.Site
+	err := json.NewDecoder(r.Body).Decode(&sites)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	err = db.InsertSites(sites)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// InsertZonesHandler inserts the given zones into the backend
+func InsertZonesHandler(w http.ResponseWriter, r *http.Request) {
+	// decode body into site
+	var zones []types.Zone
+	err := json.NewDecoder(r.Body).Decode(&zones)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	err = db.InsertZones(zones)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// InsertSubnetsHandler inserts the given zones into the backend
+func InsertSubnetsHandler(w http.ResponseWriter, r *http.Request) {
+	// decode body into site
+	var subnets []types.Subnet
+	err := json.NewDecoder(r.Body).Decode(&subnets)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	err = db.InsertSubnets(subnets)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // InsertTransitionsHandler inserts the given transitions into the backend
@@ -79,48 +172,7 @@ func InsertTransitionsHandler(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, err.Error())
 		return
 	}
-
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// GetAllTransitionsHandler returns all transition information to the client
-func GetAllTransitionsHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: the shttp package is very basic and does not allow to set the local address
-	// therefore the handler sees the default ISD-AS,127.0.0.1 address as remote. The public IP of the TP is therfore sent
-	// in the body. This should be checked to match the certificate
-	transitions, err := db.GetAllTransitions()
-	if err != nil {
-		w.Header().Set("Content-Type", "text/plain")
-		io.WriteString(w, err.Error())
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "    ") //TODO: remove after testing
-	enc.Encode(transitions)
-}
-
-// GetTransitionsHandler returns all transition information to the client
-func GetTransitionsHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: the shttp package is very basic and does not allow to set the local address
-	// therefore the handler sees the default ISD-AS,127.0.0.1 address as remote. The public IP of the TP is therfore sent
-	// in the body. This should be checked to match the certificate
-	defer r.Body.Close()
-	buf, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	transitions, err := db.GetTransitions(string(buf))
-	if err != nil {
-		w.Header().Set("Content-Type", "text/plain")
-		io.WriteString(w, err.Error())
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "    ") //TODO: remove after testing
-	enc.Encode(transitions)
 }
 
 // LogHandler logs incoming HTTP requests
@@ -144,26 +196,11 @@ func setupDB() *sqlite.Backend {
 	}
 
 	// add some test data
-	err = db.InsertZone(1, "gNB1")
-	if err != nil {
-		panic(err)
-	}
-
-	/* err = db.InsertZone(345, "other")
-	if err != nil {
-		panic(err)
-	}
-	err = db.InsertZone(456, "other")
-	if err != nil {
-		panic(err)
-	} */
-
-	err = db.InsertZone(2, "gNB2")
-	if err != nil {
-		panic(err)
-	}
-
-	err = db.InsertZone(3, "MEC")
+	err = db.InsertZones([]types.Zone{
+		{ID: 1, Name: "gNB1"},
+		{ID: 2, Name: "gNB2"},
+		{ID: 3, Name: "MEC"},
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -181,24 +218,21 @@ func setupDB() *sqlite.Backend {
 		panic(err)
 	} */
 
-	err = db.InsertSite("1-ff00:0:112,127.0.0.1", "Site A")
-	if err != nil {
-		panic(err)
-	}
-	/* err = db.InsertSite("1-ff00:0:113,172.16.0.13", "Site B")
-	if err != nil {
-		panic(err)
-	} */
-	err = db.InsertSubnet(1, net.IPNet{IP: net.ParseIP("192.168.17.90"), Mask: net.IPv4Mask(255, 255, 255, 255)}, "1-ff00:0:112,127.0.0.1") // gNB1
-	if err != nil {
-		panic(err)
-	}
-	err = db.InsertSubnet(2, net.IPNet{IP: net.ParseIP("192.168.17.91"), Mask: net.IPv4Mask(255, 255, 255, 255)}, "1-ff00:0:112,127.0.0.1") // gNB 2
+	err = db.InsertSites([]types.Site{{TPAddr: "1-ff00:0:112,127.0.0.1", Name: "Site A"}})
 	if err != nil {
 		panic(err)
 	}
 
-	err = db.InsertSubnet(3, net.IPNet{IP: net.ParseIP("192.168.14.100"), Mask: net.IPv4Mask(255, 255, 255, 255)}, "1-ff00:0:112,127.0.0.1") // MEC App Server
+	/* err = db.InsertSite("1-ff00:0:113,172.16.0.13", "Site B")
+	if err != nil {
+		panic(err)
+	} */
+
+	err = db.InsertSubnets([]types.Subnet{
+		{net.IPNet{IP: net.ParseIP("192.168.17.90"), Mask: net.IPv4Mask(255, 255, 255, 255)}, 1, "1-ff00:0:112,127.0.0.1"},  // gNB1
+		{net.IPNet{IP: net.ParseIP("192.168.17.91"), Mask: net.IPv4Mask(255, 255, 255, 255)}, 2, "1-ff00:0:112,127.0.0.1"},  // gNB 2
+		{net.IPNet{IP: net.ParseIP("192.168.14.100"), Mask: net.IPv4Mask(255, 255, 255, 255)}, 3, "1-ff00:0:112,127.0.0.1"}, // MEC App Server
+	})
 	if err != nil {
 		panic(err)
 	}
