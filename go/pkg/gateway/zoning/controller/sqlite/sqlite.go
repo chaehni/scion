@@ -13,7 +13,7 @@ import (
 	"github.com/scionproto/scion/go/pkg/gateway/zoning/types"
 )
 
-var maxZoneID = 1<<24 - 1
+var maxZoneID = types.ZoneID(1<<24 - 1)
 
 // Backend wraps the database backend
 type Backend struct {
@@ -112,76 +112,6 @@ func (b *Backend) Exec(stmt string) (sql.Result, error) {
 	return b.db.Exec(stmt)
 }
 
-/* Insertions */
-
-// InsertZone inserts a Zone into the Backend
-func (b *Backend) InsertZone(zoneID int, name string) error {
-	// check zoneID is not too big
-	if zoneID > maxZoneID {
-		return fmt.Errorf("zone ID must be at most %d", maxZoneID)
-	}
-	stmt := `INSERT INTO Zones (id, name) VALUES (?, ?)`
-	_, err := b.db.Exec(stmt, zoneID, name)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// InsertSite inserts a branch site into the Backend
-func (b *Backend) InsertSite(tpAddr string, name string) error {
-	_, err := snet.ParseUDPAddr(tpAddr)
-	if err != nil {
-		return fmt.Errorf("%s is not a valid address", tpAddr)
-	}
-	stmt := `INSERT INTO Sites (tp_address, name) VALUES (?, ?)`
-	_, err = b.db.Exec(stmt, tpAddr, name)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// InsertSubnet inserts a Subnet into the Backend
-func (b *Backend) InsertSubnet(zoneID int, net net.IPNet, tpAddr string) error {
-	if zoneID > maxZoneID {
-		return fmt.Errorf("zone ID must be at most %d", maxZoneID)
-	}
-	_, err := snet.ParseUDPAddr(tpAddr)
-	if err != nil {
-		return fmt.Errorf("%s is not a valid address", tpAddr)
-	}
-	stmt := `INSERT INTO Subnets (zone, net_ip, net_mask, tp_address) VALUES (?, ?, ?, ?)`
-	_, err = b.db.Exec(stmt, zoneID, net.IP, net.Mask, tpAddr)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// InsertTransitions inserts premitted zone transitions into the Backend
-func (b *Backend) InsertTransitions(transitions types.Transitions) error {
-	stmt := `INSERT INTO Transitions (src, dest) VALUES (?, ?)`
-
-	// do insertion in a transaction to ensure atomicity
-	tx, err := b.db.BeginTx(context.Background(), nil)
-	if err != nil {
-		return err
-	}
-
-	for src, dests := range transitions {
-		for _, dest := range dests {
-			_, err = tx.Exec(stmt, src, dest)
-			if err != nil {
-				tx.Rollback()
-				return err
-			}
-		}
-	}
-	tx.Commit()
-	return nil
-}
-
 /* Deletions */
 
 // DeleteZone inserts a Zone into the Backend
@@ -239,11 +169,57 @@ func (b *Backend) DeleteTransitions(transitions types.Transitions) error {
 
 /* Getters */
 
+// GetAllSites returns all sites stored in the backend
+func (b *Backend) GetAllSites() ([]types.Site, error) {
+
+	stmt := `SELECT tp_address, name FROM sites`
+
+	rows, err := b.db.Query(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	var sites []types.Site
+	var tp string
+	var name string
+	for rows.Next() {
+		err = rows.Scan(&tp, &name)
+		if err != nil {
+			return nil, err
+		}
+		sites = append(sites, types.Site{TPAddr: tp, Name: name})
+	}
+	return sites, nil
+}
+
+// GetAllZones returns all sites stored in the backend
+func (b *Backend) GetAllZones() ([]types.Zone, error) {
+
+	stmt := `SELECT id, name FROM zones`
+
+	rows, err := b.db.Query(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	var zones []types.Zone
+	var id int
+	var name string
+	for rows.Next() {
+		err = rows.Scan(&id, &name)
+		if err != nil {
+			return nil, err
+		}
+		zones = append(zones, types.Zone{ID: types.ZoneID(id), Name: name})
+	}
+	return zones, nil
+}
+
 // GetAllSubnets returns all subnets stored in the backend
 func (b *Backend) GetAllSubnets() ([]*types.Subnet, error) {
 
 	stmt := `SELECT net_ip, net_mask, zone, tp_address 
-	FROM   subnets`
+	FROM subnets`
 
 	rows, err := b.db.Query(stmt)
 	if err != nil {
@@ -364,4 +340,113 @@ func (b *Backend) GetTransitions(tpAddr string) (map[int][]int, error) {
 		transitions[src] = append(dests, dest)
 	}
 	return transitions, nil
+}
+
+/* Insertions */
+
+// InsertSites inserts a branch site into the Backend
+func (b *Backend) InsertSites(sites []types.Site) error {
+	stmt := `INSERT INTO sites (tp_address, name) VALUES (?, ?)`
+
+	// do insertion in a transaction to ensure atomicity
+	tx, err := b.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+
+	for _, site := range sites {
+		_, err := snet.ParseUDPAddr(site.TPAddr)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("%s is not a valid address", site.TPAddr)
+		}
+		_, err = tx.Exec(stmt, site.TPAddr, site.Name)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	tx.Commit()
+	return nil
+}
+
+// InsertZones inserts a Zone into the Backend
+func (b *Backend) InsertZones(zones []types.Zone) error {
+	stmt := `INSERT INTO zones (id, name) VALUES (?, ?)`
+
+	// do insertion in a transaction to ensure atomicity
+	tx, err := b.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+
+	for _, zone := range zones {
+		// check zoneID is not too big
+		if zone.ID > maxZoneID {
+			tx.Rollback()
+			return fmt.Errorf("zone ID must be at most %d", maxZoneID)
+		}
+		_, err := tx.Exec(stmt, zone.ID, zone.Name)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	tx.Commit()
+	return nil
+}
+
+// InsertSubnets inserts a Subnet into the Backend
+func (b *Backend) InsertSubnets(subnets []types.Subnet) error {
+	stmt := `INSERT INTO Subnets (zone, net_ip, net_mask, tp_address) VALUES (?, ?, ?, ?)`
+
+	// do insertion in a transaction to ensure atomicity
+	tx, err := b.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+
+	for _, subnet := range subnets {
+		if subnet.ZoneID > maxZoneID {
+			tx.Rollback()
+			return fmt.Errorf("zone ID must be at most %d", maxZoneID)
+		}
+		_, err := snet.ParseUDPAddr(subnet.TPAddr)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("%s is not a valid address", subnet.TPAddr)
+		}
+		_, err = tx.Exec(stmt, subnet.ZoneID, subnet.IPNet.IP, subnet.IPNet.Mask, subnet.TPAddr)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	tx.Commit()
+	return nil
+}
+
+// InsertTransitions inserts premitted zone transitions into the Backend
+func (b *Backend) InsertTransitions(transitions types.Transitions) error {
+	stmt := `INSERT INTO Transitions (src, dest) VALUES (?, ?)`
+
+	// do insertion in a transaction to ensure atomicity
+	tx, err := b.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+
+	for src, dests := range transitions {
+		for _, dest := range dests {
+			_, err = tx.Exec(stmt, src, dest)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+		}
+	}
+	tx.Commit()
+	return nil
 }

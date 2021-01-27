@@ -34,11 +34,26 @@ func main() {
 	http.HandleFunc("/api/get-transitions", apiChain(handler.GetTransitionsHandler))
 
 	/*** API used by admin frontend ***/
-	//TODO: iplement frontend
+
+	/*** READ ***/
 	http.HandleFunc("/", handler.IndexHandler)
+	http.HandleFunc("/api/get-all-sites", apiChain(handler.GetAllSitesHandler))
+	http.HandleFunc("/api/get-all-zones", apiChain(handler.GetAllZonesHandler))
 	http.HandleFunc("/api/get-all-subnets", apiChain(handler.GetAllSubnetsHandler))
 	http.HandleFunc("/api/get-all-transitions", apiChain(handler.GetAllTransitionsHandler))
+
+	/*** Insert ***/
+	http.HandleFunc("/api/insert-sites", apiChain(handler.InsertSitesHandler))
+	http.HandleFunc("/api/insert-zones", apiChain(handler.InsertZonesHandler))
+	http.HandleFunc("/api/insert-subnets", apiChain(handler.InsertSubnetsHandler))
 	http.HandleFunc("/api/insert-transitions", apiChain(handler.InsertTransitionsHandler))
+
+	/*** Delete ***/
+	http.HandleFunc("/api/delete-sites", apiChain(handler.GetAllSubnetsHandler))           // todo
+	http.HandleFunc("/api/delete-zones", apiChain(handler.GetAllSubnetsHandler))           // todo
+	http.HandleFunc("/api/delete-subnets", apiChain(handler.GetAllSubnetsHandler))         // todo
+	http.HandleFunc("/api/delete-all-transitions", apiChain(handler.GetAllSubnetsHandler)) // todo
+	http.HandleFunc("/api/delete-transition", apiChain(handler.GetAllSubnetsHandler))      // todo
 
 	// go func() {
 	log.Fatal(http.ListenAndServeTLS("192.168.1.11:4433", "cert.pem", "key.pem", nil))
