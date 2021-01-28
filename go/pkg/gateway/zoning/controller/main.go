@@ -61,3 +61,6 @@ func main() {
 
 	//log.Fatal(shttp.ListenAndServe(":8080", nil))
 }
+
+//curl --insecure https://localhost:4433/api/insert-sites --request POST  --data
+//'[{"TPAddr":"9-9999:9:9,1.1.1.1","Name":"Test site"}]'
