@@ -7,19 +7,19 @@ const (
 	SchemaVersion = 1
 
 	// Schema is the SQLite database layout.
-	Schema = `CREATE TABLE Zones(
+	Schema = `CREATE TABLE zones(
 		id INTEGER NOT NULL,
 		name TEXT,
 		PRIMARY KEY(id)
 	  );
 
-	  CREATE TABLE Sites(
+	  CREATE TABLE sites(
 		tp_address TEXT NOT NULL,
 		name TEXT,
 		PRIMARY KEY(tp_address)
 	  );
 	  
-	  CREATE TABLE Subnets(
+	  CREATE TABLE subnets(
 		net_ip BLOB NOT NULL,
 		net_mask BLOB NOT NULL,
 		zone INTEGER NOT NULL,
@@ -29,7 +29,7 @@ const (
 		FOREIGN KEY (tp_address) REFERENCES Sites(tp_address) ON DELETE CASCADE
 	  );
 	  
-	  CREATE TABLE Transitions(
+	  CREATE TABLE transitions(
 		src INTEGER NOT NULL,
 		dest INTEGER NOT NULL,
 		PRIMARY KEY (src, dest) ON CONFLICT REPLACE,

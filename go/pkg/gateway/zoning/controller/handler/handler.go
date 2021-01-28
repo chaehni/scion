@@ -229,9 +229,9 @@ func setupDB() *sqlite.Backend {
 	} */
 
 	err = db.InsertSubnets([]types.Subnet{
-		{net.IPNet{IP: net.ParseIP("192.168.17.90"), Mask: net.IPv4Mask(255, 255, 255, 255)}, 1, "1-ff00:0:112,127.0.0.1"},  // gNB1
-		{net.IPNet{IP: net.ParseIP("192.168.17.91"), Mask: net.IPv4Mask(255, 255, 255, 255)}, 2, "1-ff00:0:112,127.0.0.1"},  // gNB 2
-		{net.IPNet{IP: net.ParseIP("192.168.14.100"), Mask: net.IPv4Mask(255, 255, 255, 255)}, 3, "1-ff00:0:112,127.0.0.1"}, // MEC App Server
+		{IPNet: net.IPNet{IP: net.ParseIP("192.168.17.90"), Mask: net.IPv4Mask(255, 255, 255, 255)}, ZoneID: 1, TPAddr: "1-ff00:0:112,127.0.0.1"}, // gNB1
+		{net.IPNet{IP: net.ParseIP("192.168.17.91"), Mask: net.IPv4Mask(255, 255, 255, 255)}, 2, "1-ff00:0:112,127.0.0.1"},                        // gNB 2
+		{net.IPNet{IP: net.ParseIP("192.168.14.100"), Mask: net.IPv4Mask(255, 255, 255, 255)}, 3, "1-ff00:0:112,127.0.0.1"},                       // MEC App Server
 	})
 	if err != nil {
 		panic(err)
