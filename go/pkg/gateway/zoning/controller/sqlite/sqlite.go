@@ -112,61 +112,6 @@ func (b *Backend) Exec(stmt string) (sql.Result, error) {
 	return b.db.Exec(stmt)
 }
 
-/* Deletions */
-
-// DeleteZone inserts a Zone into the Backend
-func (b *Backend) DeleteZone(zoneID int) error {
-	stmt := `DELETE FROM Zones WHERE ID = ?`
-	_, err := b.db.Exec(stmt, zoneID)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// DeleteSite inserts a branch site into the Backend
-func (b *Backend) DeleteSite(tpAddr string) error {
-	stmt := `DELETE FROM Sites WHERE tp_address = ?`
-	_, err := b.db.Exec(stmt, tpAddr)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// DeleteSubnet inserts a Subnet into the Backend
-func (b *Backend) DeleteSubnet(net net.IPNet) error {
-	stmt := `DELETE FROM Subnets WHERE net_ip = ? AND net_mask = ?`
-	_, err := b.db.Exec(stmt, net.IP, net.Mask)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// DeleteTransitions inserts premitted zone transitions into the Backend
-func (b *Backend) DeleteTransitions(transitions types.Transitions) error {
-	stmt := `DELETE FROM Transitions WHERE src = ? AND dest = ?`
-
-	// do insertion in a transaction to ensure atomicity
-	tx, err := b.db.BeginTx(context.Background(), nil)
-	if err != nil {
-		return err
-	}
-
-	for src, dests := range transitions {
-		for _, dest := range dests {
-			_, err = tx.Exec(stmt, src, dest)
-			if err != nil {
-				tx.Rollback()
-				return err
-			}
-		}
-	}
-	tx.Commit()
-	return nil
-}
-
 /* Getters */
 
 // GetAllSites returns all sites stored in the backend
@@ -344,7 +289,7 @@ func (b *Backend) GetTransitions(tpAddr string) (map[int][]int, error) {
 
 /* Insertions */
 
-// InsertSites inserts a branch site into the Backend
+// InsertSites inserts sites into the Backend
 func (b *Backend) InsertSites(sites []types.Site) error {
 	stmt := `INSERT INTO sites (tp_address, name) VALUES (?, ?)`
 
@@ -371,7 +316,7 @@ func (b *Backend) InsertSites(sites []types.Site) error {
 	return nil
 }
 
-// InsertZones inserts a Zone into the Backend
+// InsertZones inserts zones into the Backend
 func (b *Backend) InsertZones(zones []types.Zone) error {
 	stmt := `INSERT INTO zones (id, name) VALUES (?, ?)`
 
@@ -397,7 +342,7 @@ func (b *Backend) InsertZones(zones []types.Zone) error {
 	return nil
 }
 
-// InsertSubnets inserts a Subnet into the Backend
+// InsertSubnets inserts subnets into the Backend
 func (b *Backend) InsertSubnets(subnets []types.Subnet) error {
 	stmt := `INSERT INTO Subnets (zone, net_ip, net_mask, tp_address) VALUES (?, ?, ?, ?)`
 
@@ -431,6 +376,107 @@ func (b *Backend) InsertSubnets(subnets []types.Subnet) error {
 // InsertTransitions inserts premitted zone transitions into the Backend
 func (b *Backend) InsertTransitions(transitions types.Transitions) error {
 	stmt := `INSERT INTO Transitions (src, dest) VALUES (?, ?)`
+
+	// do insertion in a transaction to ensure atomicity
+	tx, err := b.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+
+	for src, dests := range transitions {
+		for _, dest := range dests {
+			_, err = tx.Exec(stmt, src, dest)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+		}
+	}
+	tx.Commit()
+	return nil
+}
+
+/* Insertions */
+
+// DeleteSites deletes branch sites from the Backend
+func (b *Backend) DeleteSites(sites []types.Site) error {
+	stmt := `DELETE FROM sites WHERE tp_address = ?`
+
+	// do deletion in a transaction to ensure atomicity
+	tx, err := b.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+
+	for _, site := range sites {
+		_, err := snet.ParseUDPAddr(site.TPAddr)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("%s is not a valid address", site.TPAddr)
+		}
+		_, err = tx.Exec(stmt, site.TPAddr)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	tx.Commit()
+	return nil
+}
+
+// DeleteZones deletes zones from the Backend
+func (b *Backend) DeleteZones(zones []types.Zone) error {
+	stmt := `DELETE FROM zones WHERE id = ?`
+
+	// do deletions in a transaction to ensure atomicity
+	tx, err := b.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+
+	for _, zone := range zones {
+		// check zoneID is not too big
+		if zone.ID > maxZoneID {
+			tx.Rollback()
+			return fmt.Errorf("zone ID must be at most %d", maxZoneID)
+		}
+		_, err := tx.Exec(stmt, zone.ID)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	tx.Commit()
+	return nil
+}
+
+// DeleteSubnets delete subnets from the Backend
+func (b *Backend) DeleteSubnets(subnets []types.Subnet) error {
+	stmt := `DELETE FROM subnets WHERE net_ip = ? AND net_mask = ?`
+
+	// do deletions in a transaction to ensure atomicity
+	tx, err := b.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+
+	for _, subnet := range subnets {
+		fmt.Println(subnet.IPNet)
+		_, err = tx.Exec(stmt, subnet.IPNet.IP, subnet.IPNet.Mask)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	tx.Commit()
+	return nil
+}
+
+// DeleteTransitions inserts premitted zone transitions into the Backend
+func (b *Backend) DeleteTransitions(transitions types.Transitions) error {
+	stmt := `DELETE FROM Transitions WHERE src = ? AND dest = ?`
 
 	// do insertion in a transaction to ensure atomicity
 	tx, err := b.db.BeginTx(context.Background(), nil)
