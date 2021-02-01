@@ -137,7 +137,7 @@ func InsertZonesHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// InsertSubnetsHandler inserts the given zones into the backend
+// InsertSubnetsHandler inserts the given subnets into the backend
 func InsertSubnetsHandler(w http.ResponseWriter, r *http.Request) {
 	// decode body into site
 	var subnets []types.Subnet
@@ -167,6 +167,84 @@ func InsertTransitionsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err = db.InsertTransitions(transitions)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+/*** Delete Handlers (Delete) ***/
+
+// DeleteSitesHandler deletes the given sites from the backend
+func DeleteSitesHandler(w http.ResponseWriter, r *http.Request) {
+	// decode body into site
+	var sites []types.Site
+	err := json.NewDecoder(r.Body).Decode(&sites)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	err = db.DeleteSites(sites)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// DeleteZonesHandler deletes the given zones from the backend
+func DeleteZonesHandler(w http.ResponseWriter, r *http.Request) {
+	// decode body into site
+	var zones []types.Zone
+	err := json.NewDecoder(r.Body).Decode(&zones)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	err = db.DeleteZones(zones)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// DeleteSubnetsHandler deletes the given subnets from the backend
+func DeleteSubnetsHandler(w http.ResponseWriter, r *http.Request) {
+	// decode body into site
+	var subnets []types.Subnet
+	err := json.NewDecoder(r.Body).Decode(&subnets)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	err = db.DeleteSubnets(subnets)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// DeleteTransitionsHandler deletes the given transitions from the backend
+func DeleteTransitionsHandler(w http.ResponseWriter, r *http.Request) {
+	// decode body into transitions
+	var transitions types.Transitions
+	err := json.NewDecoder(r.Body).Decode(&transitions)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		io.WriteString(w, err.Error())
+		return
+	}
+	err = db.DeleteTransitions(transitions)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, err.Error())

@@ -49,11 +49,11 @@ func main() {
 	http.HandleFunc("/api/insert-transitions", apiChain(handler.InsertTransitionsHandler))
 
 	/*** Delete ***/
-	http.HandleFunc("/api/delete-sites", apiChain(handler.GetAllSubnetsHandler))           // todo
-	http.HandleFunc("/api/delete-zones", apiChain(handler.GetAllSubnetsHandler))           // todo
-	http.HandleFunc("/api/delete-subnets", apiChain(handler.GetAllSubnetsHandler))         // todo
-	http.HandleFunc("/api/delete-all-transitions", apiChain(handler.GetAllSubnetsHandler)) // todo
-	http.HandleFunc("/api/delete-transition", apiChain(handler.GetAllSubnetsHandler))      // todo
+	http.HandleFunc("/api/delete-sites", apiChain(handler.DeleteSitesHandler))
+	http.HandleFunc("/api/delete-zones", apiChain(handler.DeleteZonesHandler))
+	http.HandleFunc("/api/delete-subnets", apiChain(handler.DeleteSubnetsHandler))
+	// http.HandleFunc("/api/delete-all-transitions", apiChain(handler.GetAllSubnetsHandler)) // todo
+	http.HandleFunc("/api/delete-transitions", apiChain(handler.DeleteTransitionsHandler))
 
 	// go func() {
 	log.Fatal(http.ListenAndServeTLS("0.0.0.0:4433", "cert.pem", "key.pem", nil))
