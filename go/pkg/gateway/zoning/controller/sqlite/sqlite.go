@@ -396,7 +396,7 @@ func (b *Backend) InsertTransitions(transitions types.Transitions) error {
 	return nil
 }
 
-/* Insertions */
+/* Deletions */
 
 // DeleteSites deletes branch sites from the Backend
 func (b *Backend) DeleteSites(sites []types.Site) error {
@@ -462,7 +462,6 @@ func (b *Backend) DeleteSubnets(subnets []types.Subnet) error {
 	}
 
 	for _, subnet := range subnets {
-		fmt.Println(subnet.IPNet)
 		_, err = tx.Exec(stmt, subnet.IPNet.IP, subnet.IPNet.Mask)
 		if err != nil {
 			tx.Rollback()

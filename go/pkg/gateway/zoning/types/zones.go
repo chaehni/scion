@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"net"
 )
 
@@ -26,6 +27,40 @@ type Subnet struct {
 	IPNet  net.IPNet
 	ZoneID ZoneID
 	TPAddr string
+}
+
+func (s Subnet) MarshalJSON() ([]byte, error) {
+	dummy := struct {
+		CIDR   string
+		ZoneID ZoneID
+		TPAddr string
+	}{
+		CIDR:   s.IPNet.String(),
+		ZoneID: s.ZoneID,
+		TPAddr: s.TPAddr,
+	}
+
+	return json.Marshal(dummy)
+}
+
+func (s *Subnet) UnmarshalJSON(b []byte) error {
+	dummy := struct {
+		CIDR   string
+		ZoneID ZoneID
+		TPAddr string
+	}{}
+	err := json.Unmarshal(b, &dummy)
+	if err != nil {
+		return err
+	}
+	_, net, err := net.ParseCIDR(dummy.CIDR)
+	if err != nil {
+		return err
+	}
+	s.IPNet = *net
+	s.ZoneID = dummy.ZoneID
+	s.TPAddr = dummy.TPAddr
+	return nil
 }
 
 // Transitions maps a zone ID to all Zone IDs to which it is allowed to send data
