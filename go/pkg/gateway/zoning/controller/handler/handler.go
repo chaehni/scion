@@ -179,7 +179,7 @@ func InsertTransitionsHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteSitesHandler deletes the given sites from the backend
 func DeleteSitesHandler(w http.ResponseWriter, r *http.Request) {
-	// decode body into site
+	// decode body into sites
 	var sites []types.Site
 	err := json.NewDecoder(r.Body).Decode(&sites)
 	if err != nil {
@@ -198,7 +198,7 @@ func DeleteSitesHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteZonesHandler deletes the given zones from the backend
 func DeleteZonesHandler(w http.ResponseWriter, r *http.Request) {
-	// decode body into site
+	// decode body into zones
 	var zones []types.Zone
 	err := json.NewDecoder(r.Body).Decode(&zones)
 	if err != nil {
@@ -217,7 +217,7 @@ func DeleteZonesHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteSubnetsHandler deletes the given subnets from the backend
 func DeleteSubnetsHandler(w http.ResponseWriter, r *http.Request) {
-	// decode body into site
+	// decode body into subnets
 	var subnets []types.Subnet
 	err := json.NewDecoder(r.Body).Decode(&subnets)
 	if err != nil {
@@ -307,9 +307,9 @@ func setupDB() *sqlite.Backend {
 	} */
 
 	err = db.InsertSubnets([]types.Subnet{
-		{IPNet: net.IPNet{IP: net.ParseIP("192.168.17.90"), Mask: net.IPv4Mask(255, 255, 255, 255)}, ZoneID: 1, TPAddr: "1-ff00:0:112,127.0.0.1"}, // gNB1
-		{net.IPNet{IP: net.ParseIP("192.168.17.91"), Mask: net.IPv4Mask(255, 255, 255, 255)}, 2, "1-ff00:0:112,127.0.0.1"},                        // gNB 2
-		{net.IPNet{IP: net.ParseIP("192.168.14.100"), Mask: net.IPv4Mask(255, 255, 255, 255)}, 3, "1-ff00:0:112,127.0.0.1"},                       // MEC App Server
+		{IPNet: net.IPNet{IP: net.IPv4(192, 168, 17, 90).To4(), Mask: net.IPv4Mask(255, 255, 255, 255)}, ZoneID: 1, TPAddr: "1-ff00:0:112,127.0.0.1"}, // gNB1
+		{net.IPNet{IP: net.IPv4(192, 168, 17, 91).To4(), Mask: net.IPv4Mask(255, 255, 255, 255)}, 2, "1-ff00:0:112,127.0.0.1"},                        // gNB 2
+		{net.IPNet{IP: net.IPv4(192, 168, 14, 100).To4(), Mask: net.IPv4Mask(255, 255, 255, 255)}, 3, "1-ff00:0:112,127.0.0.1"},                       // MEC App Server
 	})
 	if err != nil {
 		panic(err)
