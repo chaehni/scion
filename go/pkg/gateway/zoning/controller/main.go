@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 
@@ -27,6 +28,15 @@ func main() {
 		},
 	} */
 
+	// flag setup
+	dbPath := flag.String("db", ":memory:", "path to the database file")
+	listen := flag.String("listen", ":4433", "server listen address")
+
+	flag.Parse()
+
+	// init DB
+	handler.SetupDB(*dbPath)
+
 	apiChain := handler.LogHandler
 
 	/*** API used by Zone Translation Points ***/
@@ -34,7 +44,6 @@ func main() {
 	http.HandleFunc("/api/get-transitions", apiChain(handler.GetTransitionsHandler))
 
 	/*** API used by admin frontend ***/
-
 	/*** READ ***/
 	http.HandleFunc("/", handler.IndexHandler)
 	http.HandleFunc("/api/get-all-sites", apiChain(handler.GetAllSitesHandler))
@@ -56,7 +65,7 @@ func main() {
 	http.HandleFunc("/api/delete-transitions", apiChain(handler.DeleteTransitionsHandler))
 
 	// go func() {
-	log.Fatal(http.ListenAndServeTLS("0.0.0.0:4433", "cert.pem", "key.pem", nil))
+	log.Fatal(http.ListenAndServeTLS(*listen, "cert.pem", "key.pem", nil))
 	//}()
 
 	//log.Fatal(shttp.ListenAndServe(":8080", nil))
