@@ -16,14 +16,9 @@ import (
 
 var db *sqlite.Backend
 
-func init() {
-	// get a database handle
-	db = setupDB()
-}
-
 // IndexHandler handles the default route
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Hello from the Controller")
+	io.WriteString(w, "Hello from the Controller\n")
 }
 
 /*** GET Handlers (Read) ***/
@@ -267,13 +262,18 @@ func LogHandler(fn http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func setupDB() *sqlite.Backend {
-	db, err := sqlite.New(":memory:")
+func SetupDB(path string) {
+	var err error
+	db, err = sqlite.New(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// add some test data
+	// if in memory DB is used, add some test data
+	if path != ":memory:" {
+		return
+	}
+
 	err = db.InsertZones([]types.Zone{
 		{ID: 1, Name: "gNB1"},
 		{ID: 2, Name: "gNB2"},
@@ -325,5 +325,5 @@ func setupDB() *sqlite.Backend {
 	if err != nil {
 		panic(err)
 	}
-	return db
+
 }
